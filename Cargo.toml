@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.2.5", features = ["cargo", "derive"] }
+octocrab = "0.21.0"
