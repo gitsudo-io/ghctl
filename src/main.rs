@@ -1,3 +1,10 @@
+mod commands;
+mod ghctl;
+
+use clap::Parser;
+use commands::Opts;
+
 fn main() {
-    println!("Hello, world!");
+    let opts = Opts::parse();
+    ghctl::cli(opts);
 }
