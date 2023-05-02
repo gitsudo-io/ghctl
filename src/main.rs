@@ -4,7 +4,8 @@ mod ghctl;
 use clap::Parser;
 use commands::Opts;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let opts = Opts::parse();
-    ghctl::cli(opts);
+    ghctl::cli(opts).await;
 }

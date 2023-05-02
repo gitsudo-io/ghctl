@@ -1,5 +1,4 @@
 ///! This module defines the commands, subcommands, and arguments for ghctl.
-
 use clap::{Args, Parser, Subcommand};
 
 /// The top level clap parser and CLI arguments
@@ -16,12 +15,11 @@ pub struct Opts {
     pub command: Commands,
 }
 
-
 /// The top-level commands
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     #[command(about = "Manage repository configuration")]
-    Repo(Repo)
+    Repo(Repo),
 }
 
 /// The `repo` subcommand
@@ -35,24 +33,8 @@ pub struct Repo {
 #[derive(Subcommand, Debug)]
 pub enum RepoCommands {
     #[command(about = "Apply repository configuration")]
-    Config(RepoConfig),
-}
-
-/// The `repo config` subcommand
-#[derive(Args, Debug)]
-pub struct RepoConfig {
-    #[command(subcommand)]
-    pub command: RepoConfigCommands,
-}
-
-/// The `repo config` subcommands
-#[derive(Subcommand, Debug)]
-pub enum RepoConfigCommands {
-    #[command(about = "Apply repository configuration")]
-    Apply {
-        #[arg(help = "Repository to apply configuration to")]
-        repository: Option<String>,
-        #[arg(short = 'F', long = "config-file", help = "Configuration file to apply")]
-        config_file: Option<String>,
+    Get {
+        #[arg(help = "The repository full name, e.g. 'aisrael/ghctl'")]
+        repo_name: Option<String>,
     },
 }
