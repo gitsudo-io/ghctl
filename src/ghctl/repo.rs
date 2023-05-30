@@ -1,4 +1,5 @@
 use anyhow::Result;
+use http::HeaderName;
 use octocrab::models::Repository;
 use octocrab::params::teams::Permission;
 use octocrab::OctocrabBuilder;
@@ -16,24 +17,37 @@ pub async fn get_repo(access_token: &String, owner: &str, repo_name: &str) -> Re
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RepoConfig {
-    pub teams: HashMap<String, String>,
+    pub teams: Option<HashMap<String, String>>,
+    pub collaborators: Option<HashMap<String, String>>,
 }
 
 fn permission_from_s(s: &String) -> Option<Permission> {
     match s.as_str() {
         "pull" => Some(Permission::Pull),
-        "push" => Some(Permission::Push),
-        "admin" => Some(Permission::Admin),
-        "maintain" => Some(Permission::Maintain),
         "triage" => Some(Permission::Triage),
+        "push" => Some(Permission::Push),
+        "maintain" => Some(Permission::Maintain),
+        "admin" => Some(Permission::Admin),
         _ => None,
+    }
+}
+
+fn permission_to_s(permission: &Permission) -> &str {
+    match permission {
+        Permission::Pull => "pull",
+        Permission::Triage => "triage",
+        Permission::Push => "push",
+        Permission::Maintain => "maintain",
+        Permission::Admin => "admin",
+        _ => "",
     }
 }
 
 impl RepoConfig {
     pub fn new() -> RepoConfig {
         RepoConfig {
-            teams: HashMap::new(),
+            teams: Some(HashMap::new()),
+            collaborators: Some(HashMap::new()),
         }
     }
 
@@ -44,46 +58,114 @@ impl RepoConfig {
         repo_name: String,
     ) -> anyhow::Result<()> {
         println!("Applying configuration");
-        self.apply_teams(access_token, owner, repo_name).await
-    }
-
-    async fn apply_teams(
-        &self,
-        access_token: String,
-        owner: String,
-        repo_name: String,
-    ) -> anyhow::Result<()> {
-        println!("Applying teams");
         let octocrab = OctocrabBuilder::default()
-            .personal_token(access_token)
+            .personal_token(access_token.clone())
             .build()?;
 
-        for (team_slug, permission_s) in &self.teams {
-            let permission = permission_from_s(permission_s).unwrap();
-
-            match octocrab
-                .teams(&owner)
-                .repos(team_slug)
-                .add_or_update(&owner, &repo_name, permission)
-                .await
-            {
-                Ok(_) => {
-                    println!(
-                        "Added team {} with permission {:?} to repository {}/{}",
-                        team_slug, permission, owner, repo_name
-                    );
-                }
-                Err(e) => {
-                    println!(
-                        "Error adding team {} with permission {:?} to repository {}/{}: {}",
-                        team_slug, permission, owner, repo_name, e
-                    );
-                }
-            }
+        if let Some(team_permissions) = &self.teams {
+            apply_teams(&octocrab, &owner, &repo_name, team_permissions).await?;
         }
 
+        let octocrab = OctocrabBuilder::default()
+            .personal_token(access_token)
+            .add_header(
+                HeaderName::from_static("accept"),
+                "application/vnd.github+json".to_string(),
+            )
+            .add_header(
+                HeaderName::from_static("x-github-api-version"),
+                "2022-11-28".to_string(),
+            )
+            .build()?;
+        if let Some(collaborator_permissions) = &self.collaborators {
+            apply_collaborators(&octocrab, &owner, &repo_name, collaborator_permissions).await?;
+        }
         Ok(())
     }
+}
+
+async fn apply_teams(
+    octocrab: &octocrab::Octocrab,
+    owner: &String,
+    repo_name: &String,
+    team_permissions: &HashMap<String, String>,
+) -> anyhow::Result<()> {
+    println!("Applying teams");
+    for (team_slug, permission_s) in team_permissions {
+        let permission = permission_from_s(permission_s).unwrap();
+
+        match octocrab
+            .teams(owner)
+            .repos(team_slug)
+            .add_or_update(owner, repo_name, permission)
+            .await
+        {
+            Ok(_) => {
+                println!(
+                    "Added team {} with permission {:?} to repository {}/{}",
+                    team_slug, permission, owner, repo_name
+                );
+            }
+            Err(e) => {
+                println!(
+                    "Error adding team {} with permission {:?} to repository {}/{}: {}",
+                    team_slug, permission, owner, repo_name, e
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RepositoryInvitation {
+    pub id: u64,
+    pub node_id: String,
+    pub repository: Option<HashMap<String, serde_json::Value>>,
+    pub invitee: Option<HashMap<String, serde_json::Value>>,
+    pub inviter: Option<HashMap<String, serde_json::Value>>,
+    pub permissions: String,
+    pub created_at: String,
+    pub url: String,
+    pub html_url: String,
+}
+
+async fn apply_collaborators(
+    octocrab: &octocrab::Octocrab,
+    owner: &String,
+    repo: &String,
+    collaborator_permissions: &HashMap<String, String>,
+) -> anyhow::Result<()> {
+    println!("Applying collaborators");
+
+    for (username, permission_s) in collaborator_permissions {
+        let permission = permission_from_s(permission_s).unwrap();
+        let value = permission_to_s(&permission);
+        let route = format!("/repos/{owner}/{repo}/collaborators/{username}");
+        println!("route: {route}");
+        let body = serde_json::json!({ "permission": value });
+
+        let result = octocrab._put(route, Some(&body)).await;
+
+        match result {
+            Ok(resp) => {
+                println!(
+                    "Added collaborator {username} with permission {value} to repository {owner}/{repo}"
+                );
+                println!("Response: {}", resp.status());
+                println!("Response: {:?}", resp.body());
+            }
+            Err(e) => {
+                println!(
+                    "Error adding collaborator {username} with permission {value} to repository {owner}/{repo}: {e}"
+                );
+                return Err(e.into());
+            }
+        }
+    }
+
+    Ok(())
 }
 
 impl Default for RepoConfig {
@@ -94,6 +176,7 @@ impl Default for RepoConfig {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use ::http::header::HeaderName;
     use octocrab::OctocrabBuilder;
     use std::env;
@@ -101,8 +184,11 @@ mod tests {
     #[tokio::test]
     async fn test_repo_config() -> Result<(), Box<dyn std::error::Error>> {
         let repo_config = serde_yaml::from_str::<super::RepoConfig>(
-            r#"teams:
+            r#"
+            teams:
                 a-team: maintain
+            collaborators:
+                aisrael: admin
             "#,
         )
         .unwrap();

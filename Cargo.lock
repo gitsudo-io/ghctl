@@ -437,6 +437,7 @@ dependencies = [
  "anyhow",
  "clap",
  "http",
+ "hyper",
  "octocrab",
  "serde",
  "serde_json",

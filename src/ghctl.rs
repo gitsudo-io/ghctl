@@ -1,6 +1,7 @@
 ///! This module defines actual code that executes the ghctl commands.
-mod repo;
+pub mod repo;
 
+use crate::commands;
 use crate::commands::{Commands, Opts, RepoCommands};
 use anyhow::Result;
 
@@ -20,10 +21,14 @@ fn build_context(opts: Opts) -> Result<Context> {
 fn get_access_token(opts: &Opts) -> Result<String> {
     match &opts.access_token {
         Some(access_token) => Ok(access_token.clone()),
-        None => match std::env::var("GITHUB_TOKEN") {
-            Ok(access_token) => Ok(access_token),
-            Err(e) => Err(anyhow::anyhow!(e)),
-        },
+        None => maybe_get_github_token_env_var(),
+    }
+}
+
+fn maybe_get_github_token_env_var() -> Result<String> {
+    match std::env::var("GITHUB_TOKEN") {
+        Ok(access_token) => Ok(access_token),
+        Err(e) => Err(anyhow::anyhow!(e)),
     }
 }
 
@@ -38,6 +43,10 @@ pub async fn cli(opts: Opts) {
                         Ok(repo) => println!("{}", serde_json::to_string_pretty(&repo).unwrap()),
                         Err(e) => println!("Error: {}", e),
                     }
+                }
+
+                RepoCommands::Config(repo_config) =>  {
+                    commands::repo::handle_repo_config_commands(&context, repo_config).await.unwrap();                    
                 }
             },
         },
