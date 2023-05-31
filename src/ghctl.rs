@@ -2,7 +2,6 @@
 pub mod repo;
 
 use crate::commands;
-use crate::commands::repo::RepoCommands;
 use crate::commands::{Commands, Opts};
 use anyhow::Result;
 
@@ -37,21 +36,7 @@ fn maybe_get_github_token_env_var() -> Result<String> {
 pub async fn cli(opts: Opts) {
     match build_context(opts) {
         Ok(context) => match &context.opts.command {
-            Commands::Repo(repo) => match &repo.command {
-                RepoCommands::Get { repo_name } => {
-                    let v: Vec<&str> = repo_name.as_ref().unwrap().split("/").collect();
-                    match repo::get_repo(&context.access_token, v[0], v[1]).await {
-                        Ok(repo) => println!("{}", serde_json::to_string_pretty(&repo).unwrap()),
-                        Err(e) => println!("Error: {}", e),
-                    }
-                }
-
-                RepoCommands::Config(repo_config) => {
-                    commands::repo::handle_repo_config_commands(&context, repo_config)
-                        .await
-                        .unwrap();
-                }
-            },
+            Commands::Repo(repo) => commands::repo::handle_repo_command(&context, repo).await,
         },
         Err(e) => println!("Error: {}", e),
     }
