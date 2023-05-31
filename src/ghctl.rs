@@ -2,7 +2,8 @@
 pub mod repo;
 
 use crate::commands;
-use crate::commands::{Commands, Opts, RepoCommands};
+use crate::commands::{Commands, Opts};
+use crate::commands::repo::RepoCommands;
 use anyhow::Result;
 
 /// A context object that holds state for the ghctl commands

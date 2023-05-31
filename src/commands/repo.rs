@@ -1,14 +1,52 @@
 use anyhow::Result;
+use clap::{Args, Subcommand};
 
 use crate::ghctl;
 use crate::ghctl::repo::RepoConfig;
-use crate::commands::{RepoConfigCommand, RepoConfigSubcommand};
+
+/// The `repo` subcommand
+#[derive(Args, Debug)]
+pub struct Repo {
+    #[command(subcommand)]
+    pub command: RepoCommands,
+}
+
+/// The `repo` subcommands
+#[derive(Subcommand, Debug)]
+pub enum RepoCommands {
+    #[command(about = "Apply repository configuration")]
+    Get {
+        #[arg(help = "The repository full name, e.g. 'aisrael/ghctl'")]
+        repo_name: Option<String>,
+    },
+    Config(RepoConfigCommand),
+}
+
+#[derive(Args, Debug)]
+pub struct RepoConfigCommand {
+    #[command(subcommand)]
+    pub command: RepoConfigSubcommand,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum RepoConfigSubcommand {
+    #[command(about = "Retrieve repository configuration")]
+    Get {
+    #[arg(help = "The repository full name, e.g. 'aisrael/ghctl'")]
+    repo_full_name: Option<String>,
+    },
+    #[command(about = "Apply repository configuration")]
+    Apply {
+    #[arg(help = "The repository full name, e.g. 'aisrael/ghctl'")]
+        repo_full_name: Option<String>,
+    },
+}
 
 pub async fn handle_repo_config_commands(context: &ghctl::Context, repo_config: &RepoConfigCommand) -> Result<()> {
 
     match &repo_config.command {
         RepoConfigSubcommand::Get { repo_full_name } => {
-            println!("Getting configuration for {}", repo_full_name.as_ref().unwrap());
+            ghctl::repo::get_repo_config(&context, repo_full_name.as_ref().unwrap()).await?;
         },
         RepoConfigSubcommand::Apply { repo_full_name } => {
             let v: Vec<&str> = repo_full_name.as_ref().unwrap().split("/").collect();

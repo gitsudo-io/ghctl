@@ -6,6 +6,14 @@ use octocrab::OctocrabBuilder;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+
+/// A struct that represents the ghctl configuration for a GitHub repository
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RepoConfig {
+    pub teams: Option<HashMap<String, String>>,
+    pub collaborators: Option<HashMap<String, String>>,
+}
+
 pub async fn get_repo(access_token: &String, owner: &str, repo_name: &str) -> Result<Repository> {
     let octocrab = OctocrabBuilder::default()
         .personal_token(access_token.clone())
@@ -15,10 +23,13 @@ pub async fn get_repo(access_token: &String, owner: &str, repo_name: &str) -> Re
     Ok(repository)
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RepoConfig {
-    pub teams: Option<HashMap<String, String>>,
-    pub collaborators: Option<HashMap<String, String>>,
+pub async fn get_repo_config(
+    _context: &crate::ghctl::Context,
+    repo_full_name: &String,
+) -> Result<()> {
+    println!("Getting configuration for {}", repo_full_name);
+
+    Ok(())
 }
 
 fn permission_from_s(s: &String) -> Option<Permission> {
