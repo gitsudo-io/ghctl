@@ -2,8 +2,8 @@
 pub mod repo;
 
 use crate::commands;
-use crate::commands::{Commands, Opts};
 use crate::commands::repo::RepoCommands;
+use crate::commands::{Commands, Opts};
 use anyhow::Result;
 
 /// A context object that holds state for the ghctl commands
@@ -46,8 +46,10 @@ pub async fn cli(opts: Opts) {
                     }
                 }
 
-                RepoCommands::Config(repo_config) =>  {
-                    commands::repo::handle_repo_config_commands(&context, repo_config).await.unwrap();                    
+                RepoCommands::Config(repo_config) => {
+                    commands::repo::handle_repo_config_commands(&context, repo_config)
+                        .await
+                        .unwrap();
                 }
             },
         },
