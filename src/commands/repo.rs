@@ -2,7 +2,6 @@ use anyhow::Result;
 use clap::{Args, Subcommand};
 
 use crate::ghctl;
-use crate::ghctl::repo::RepoConfig;
 use crate::utils::split_repo_full_name;
 
 /// The `repo` subcommand
@@ -40,6 +39,13 @@ pub enum RepoConfigSubcommand {
     Apply {
         #[arg(help = "The repository full name, e.g. 'aisrael/ghctl'")]
         repo_full_name: Option<String>,
+
+        #[arg(
+            short = 'F',
+            long = "config-file",
+            help = "The configuration file to apply"
+        )]
+        config_files: Vec<String>
     },
 }
 
@@ -61,23 +67,16 @@ pub async fn repo(context: &ghctl::Context, repo: &RepoCommand) {
 
 pub async fn config(context: &ghctl::Context, repo_config: &RepoConfigCommand) -> Result<()> {
     match &repo_config.command {
-        RepoConfigSubcommand::Get { repo_full_name } => {
-            ghctl::repo::get_repo_config(&context, repo_full_name.as_ref().unwrap()).await?;
+        RepoConfigSubcommand::Get { repo_full_name } => 
+            ghctl::repo::get_repo_config(&context, repo_full_name.as_ref().unwrap()).await,
+        
+        RepoConfigSubcommand::Apply { repo_full_name, config_files } => {
+            let (owner, repo_name) = split_repo_full_name(repo_full_name).unwrap();
+            match ghctl::repo::config_apply(&context.access_token, owner, repo_name, config_files).await {
+                Ok(_) => println!("Applied configuration to {}", repo_full_name.as_ref().unwrap()),
+                Err(e) => println!("Error: {}", e),
+            }
+           Ok(())
         }
-        RepoConfigSubcommand::Apply { repo_full_name } => {
-            config_apply(&context, repo_full_name).await;
-        }
-    }
-
-    Ok(())
-}
-
-pub async fn config_apply(context: &ghctl::Context, repo_full_name: &Option<String>) {
-    let (owner, repo_name) = split_repo_full_name(repo_full_name).unwrap();
-    match ghctl::repo::config_apply(&context.access_token, owner, repo_name).await {
-        Ok(()) => {
-            println!("Applied configuration")
-        }
-        Err(e) => println!("Error: {}", e),
     }
 }

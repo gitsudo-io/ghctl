@@ -240,7 +240,10 @@ mod tests {
     }
 }
 
-pub async fn config_apply(access_token: &String, owner: impl Into<String>, repo_name: impl Into<String>) -> Result<()> {
+pub async fn config_apply(access_token: &String, owner: impl Into<String>, repo_name: impl Into<String>, config_files: &Vec<String>) -> Result<()> {
     println!("Applying configuration to {}/{}", owner.into(), repo_name.into());
+    for config_file in config_files {
+        println!("Applying configuration from {config_file}");
+    }
     Ok(())
 }
