@@ -1,0 +1,2 @@
+# ghctl
+A GitHub utility
