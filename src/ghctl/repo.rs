@@ -191,7 +191,13 @@ mod tests {
     use octocrab::OctocrabBuilder;
     use std::env;
 
+    /// We ignore this test for now as it requires a TEST_PERSONAL_ACCESS_TOKEN and
+    /// performs actual GitHub API calls, until we can add some VCR-like HTTP recording
+    /// in the future.
+    /// 
+    /// To run ignored tests locally, use `cargo test -- --ignored`
     #[tokio::test]
+    #[ignore]
     async fn test_repo_config() -> Result<(), Box<dyn std::error::Error>> {
         let repo_config = serde_yaml::from_str::<super::RepoConfig>(
             r#"
