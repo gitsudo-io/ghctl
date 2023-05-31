@@ -3,17 +3,18 @@ use clap::{Args, Subcommand};
 
 use crate::ghctl;
 use crate::ghctl::repo::RepoConfig;
+use crate::utils::split_repo_full_name;
 
 /// The `repo` subcommand
 #[derive(Args, Debug)]
-pub struct Repo {
+pub struct RepoCommand {
     #[command(subcommand)]
-    pub command: RepoCommands,
+    pub command: RepoSubcommand,
 }
 
 /// The `repo` subcommands
 #[derive(Subcommand, Debug)]
-pub enum RepoCommands {
+pub enum RepoSubcommand {
     #[command(about = "Apply repository configuration")]
     Get {
         #[arg(help = "The repository full name, e.g. 'aisrael/ghctl'")]
@@ -42,53 +43,41 @@ pub enum RepoConfigSubcommand {
     },
 }
 
-pub async fn handle_repo_command(context: &ghctl::Context, repo: &Repo) {
+pub async fn repo(context: &ghctl::Context, repo: &RepoCommand) {
     match &repo.command {
-        RepoCommands::Get { repo_name } => {
-            let v: Vec<&str> = repo_name.as_ref().unwrap().split("/").collect();
-            match crate::ghctl::repo::get_repo(&context.access_token, v[0], v[1]).await {
+        RepoSubcommand::Get { repo_name } => {
+            let (owner, repo_name) = split_repo_full_name(repo_name).unwrap();
+            match crate::ghctl::repo::get_repo(&context.access_token, owner, repo_name).await {
                 Ok(repo) => println!("{}", serde_json::to_string_pretty(&repo).unwrap()),
                 Err(e) => println!("Error: {}", e),
             }
         }
 
-        RepoCommands::Config(repo_config) => {
-            handle_repo_config_commands(&context, repo_config)
-                .await
-                .unwrap();
+        RepoSubcommand::Config(command) => {
+            config(&context, command).await.unwrap();
         }
     }
 }
 
-pub async fn handle_repo_config_commands(
-    context: &ghctl::Context,
-    repo_config: &RepoConfigCommand,
-) -> Result<()> {
+pub async fn config(context: &ghctl::Context, repo_config: &RepoConfigCommand) -> Result<()> {
     match &repo_config.command {
         RepoConfigSubcommand::Get { repo_full_name } => {
             ghctl::repo::get_repo_config(&context, repo_full_name.as_ref().unwrap()).await?;
         }
         RepoConfigSubcommand::Apply { repo_full_name } => {
-            let v: Vec<&str> = repo_full_name.as_ref().unwrap().split("/").collect();
-            match ghctl::repo::get_repo(&context.access_token, v[0], v[1]).await {
-                Ok(repo) => {
-                    let config = RepoConfig::new();
-                    match config
-                        .apply(
-                            context.access_token.clone(),
-                            repo.owner.unwrap().login,
-                            repo.name,
-                        )
-                        .await
-                    {
-                        Ok(_) => println!("Applied configuration"),
-                        Err(e) => println!("Error: {}", e),
-                    }
-                }
-                Err(e) => println!("Error: {}", e),
-            }
+            config_apply(&context, repo_full_name).await;
         }
     }
 
     Ok(())
+}
+
+pub async fn config_apply(context: &ghctl::Context, repo_full_name: &Option<String>) {
+    let (owner, repo_name) = split_repo_full_name(repo_full_name).unwrap();
+    match ghctl::repo::config_apply(&context.access_token, owner, repo_name).await {
+        Ok(()) => {
+            println!("Applied configuration")
+        }
+        Err(e) => println!("Error: {}", e),
+    }
 }

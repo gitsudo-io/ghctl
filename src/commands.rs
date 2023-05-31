@@ -2,7 +2,7 @@
 pub mod repo;
 
 use clap::{Parser, Subcommand};
-use repo::Repo;
+use repo::RepoCommand;
 
 /// The top level clap parser and CLI arguments
 #[derive(Parser, Debug)]
@@ -22,5 +22,7 @@ pub struct Opts {
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     #[command(about = "Manage repository configuration")]
-    Repo(Repo),
+    Repo(RepoCommand),
 }
+
+pub use repo::repo;

@@ -1,5 +1,6 @@
 mod commands;
 mod ghctl;
+mod utils;
 
 use clap::Parser;
 use commands::Opts;

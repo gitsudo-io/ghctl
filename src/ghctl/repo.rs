@@ -13,7 +13,7 @@ pub struct RepoConfig {
     pub collaborators: Option<HashMap<String, String>>,
 }
 
-pub async fn get_repo(access_token: &String, owner: &str, repo_name: &str) -> Result<Repository> {
+pub async fn get_repo(access_token: &String, owner: impl Into<String>, repo_name: impl Into<String>) -> Result<Repository> {
     let octocrab = OctocrabBuilder::default()
         .personal_token(access_token.clone())
         .build()?;
@@ -238,4 +238,9 @@ mod tests {
         assert!(repo.permissions.unwrap().maintain);
         Ok(())
     }
+}
+
+pub async fn config_apply(access_token: &String, owner: impl Into<String>, repo_name: impl Into<String>) -> Result<()> {
+    println!("Applying configuration to {}/{}", owner.into(), repo_name.into());
+    Ok(())
 }

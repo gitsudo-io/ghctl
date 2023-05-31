@@ -36,8 +36,9 @@ fn maybe_get_github_token_env_var() -> Result<String> {
 pub async fn cli(opts: Opts) {
     match build_context(opts) {
         Ok(context) => match &context.opts.command {
-            Commands::Repo(repo) => commands::repo::handle_repo_command(&context, repo).await,
+            Commands::Repo(repo) => commands::repo::repo(&context, repo).await,
         },
         Err(e) => println!("Error: {}", e),
     }
 }
+ 
