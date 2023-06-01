@@ -2,7 +2,7 @@
 pub mod repo;
 
 use clap::{Parser, Subcommand};
-use clap_verbosity_flag::{Verbosity, InfoLevel};
+use clap_verbosity_flag::{InfoLevel, Verbosity};
 use repo::RepoCommand;
 
 /// The top level clap parser and CLI arguments
@@ -27,6 +27,7 @@ pub struct Opts {
 pub enum Commands {
     #[command(about = "Manage repository configuration")]
     Repo(RepoCommand),
+    Version,
 }
 
 pub use repo::repo;

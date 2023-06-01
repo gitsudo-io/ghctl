@@ -46,7 +46,7 @@ pub enum RepoConfigSubcommand {
             long = "config-file",
             help = "The configuration file to apply"
         )]
-        config_files: Vec<String>
+        config_files: Vec<String>,
     },
 }
 
@@ -68,16 +68,25 @@ pub async fn repo(context: &ghctl::Context, repo: &RepoCommand) {
 
 pub async fn config(context: &ghctl::Context, repo_config: &RepoConfigCommand) -> Result<()> {
     match &repo_config.command {
-        RepoConfigSubcommand::Get { repo_full_name } => 
-            ghctl::repo::get_repo_config(&context, repo_full_name.as_ref().unwrap()).await,
-        
-        RepoConfigSubcommand::Apply { repo_full_name, config_files } => {
+        RepoConfigSubcommand::Get { repo_full_name } => {
+            ghctl::repo::get_repo_config(&context, repo_full_name.as_ref().unwrap()).await
+        }
+
+        RepoConfigSubcommand::Apply {
+            repo_full_name,
+            config_files,
+        } => {
             let (owner, repo_name) = split_repo_full_name(repo_full_name).unwrap();
-            match ghctl::repo::config_apply(&context.access_token, owner, repo_name, config_files).await {
-                Ok(_) => info!("Applied configuration to {}", repo_full_name.as_ref().unwrap()),
+            match ghctl::repo::config_apply(&context.access_token, owner, repo_name, config_files)
+                .await
+            {
+                Ok(_) => info!(
+                    "Applied configuration to {}",
+                    repo_full_name.as_ref().unwrap()
+                ),
                 Err(e) => error!("Error: {}", e),
             }
-           Ok(())
+            Ok(())
         }
     }
 }

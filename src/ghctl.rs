@@ -36,22 +36,30 @@ fn maybe_get_github_token_env_var() -> Result<String> {
             VarError::NotPresent => {
                 error!("No access token provided and GITHUB_TOKEN environment variable not set, aborting.");
                 exit(1)
-            },
-            _ => Err(anyhow::anyhow!(e))
+            }
+            _ => Err(anyhow::anyhow!(e)),
         },
     }
 }
 
 /// Run the ghctl CLI
 pub async fn cli(opts: Opts) {
-    env_logger::builder()
-        .filter_level(opts.verbose.log_level_filter())
-        .target(env_logger::Target::Stdout)
-        .init();
-    match build_context(opts) {
-        Ok(context) => match &context.opts.command {
-            Commands::Repo(repo) => commands::repo::repo(&context, repo).await,
-        },
-        Err(e) => error!("Error: {}", e),
+    match &opts.command {
+        Commands::Version => println!("ghctl version {}", clap::crate_version!()),
+        _ => {
+            env_logger::builder()
+                .filter_level(opts.verbose.log_level_filter())
+                .target(env_logger::Target::Stdout)
+                .init();
+            match build_context(opts) {
+                Ok(context) => match &context.opts.command {
+                    Commands::Repo(repo) => commands::repo::repo(&context, repo).await,
+                    _ => {
+                        error!("Not yet implemented: {:?}", &context.opts.command)
+                    }
+                },
+                Err(e) => error!("Error: {}", e),
+            }
+        }
     }
 }
