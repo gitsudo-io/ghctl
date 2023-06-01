@@ -263,9 +263,8 @@ async fn apply_collaborators(
                         );
                 }
                 _ => {
-                    debug!("Response: {}", resp.status());
                     error!(
-                            "Error updating collaborator {username} with permission {value} to repository {owner}/{repo}: {e}"
+                            "Error updating collaborator {username} with permission {value} to repository {owner}/{repo}: {}", resp.status()
                         );
                     return Err(anyhow::anyhow!(resp.status()));
                 }
