@@ -16,6 +16,5 @@ runs:
         version: tags/v0.1.0
         file: ghctl
         target: /usr/local/bin/ghctl
-        token: ${{ secrets.GITHUB_TOKEN }}
     - shell: bash
       run: ghctl ${{ inputs.args }}
