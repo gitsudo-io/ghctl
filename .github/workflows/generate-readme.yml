@@ -1,0 +1,30 @@
+name: Generate README
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - action.yml
+      - .github/README.md.erb
+
+jobs:
+  generate-readme:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: if [ -f README.md ]; then rm README.md; fi
+      - name: Generate README
+        uses: ./.
+        with:
+          template-filename: .github/README.md.erb
+          output-filename: README.md
+      - run: |
+          cat README.md
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v4
+        with:
+          add-paths: README.md
+          base: main
+          branch: update-readme
+          delete-branch: true
+          title: Update README.md
