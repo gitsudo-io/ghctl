@@ -18,4 +18,5 @@ runs:
         target: /usr/local/bin/ghctl
     - shell: bash
       run: |
+        chmod +x /usr/local/bin/ghctl
         ghctl ${{ inputs.args }}
