@@ -1,5 +1,6 @@
 use anyhow::Result;
 use http::HeaderName;
+use log::{debug, info, error};
 use octocrab::models::Repository;
 use octocrab::params::teams::Permission;
 use octocrab::OctocrabBuilder;
@@ -13,7 +14,11 @@ pub struct RepoConfig {
     pub collaborators: Option<HashMap<String, String>>,
 }
 
-pub async fn get_repo(access_token: &String, owner: impl Into<String>, repo_name: impl Into<String>) -> Result<Repository> {
+pub async fn get_repo(
+    access_token: &String,
+    owner: impl Into<String>,
+    repo_name: impl Into<String>,
+) -> Result<Repository> {
     let octocrab = OctocrabBuilder::default()
         .personal_token(access_token.clone())
         .build()?;
@@ -26,9 +31,84 @@ pub async fn get_repo_config(
     _context: &crate::ghctl::Context,
     repo_full_name: &String,
 ) -> Result<()> {
-    println!("Getting configuration for {}", repo_full_name);
+    info!("Getting configuration for {}", repo_full_name);
 
     Ok(())
+}
+
+pub async fn config_apply(
+    access_token: &String,
+    owner: impl Into<String>,
+    repo: impl Into<String>,
+    config_files: &Vec<String>,
+) -> Result<()> {
+    let owner = owner.into();
+    let repo = repo.into();
+    debug!("Applying configuration to {owner}/{repo}");
+
+    if config_files.len() == 0 {
+        println!("No configuration files specified! Please specify one or more configuration files with -F/--config-file");
+        return Ok(());
+    }
+
+    let merged_config = config_files
+        .iter()
+        .try_fold(RepoConfig::new(), |config, config_file| {
+            debug!("Reading configuration file {config_file}");
+            match std::fs::File::open(config_file) {
+                Ok(f) => {
+                    match serde_yaml::from_reader(f) {
+                        Ok(repo_config) => Ok(merge_config(config, repo_config)),
+                        Err(e) => {
+                            error!("Error deserializing configuration file {config_file}: {e}");
+                            Err(anyhow::anyhow!(e))
+                        }
+                    }
+                },
+                Err(e) => {
+                    error!("Error reading configuration file {config_file}: {e}");
+                    Err(anyhow::anyhow!(e))
+                }                
+            }
+        })?;
+
+    debug!("Applying merged configuration: {:?}", merged_config);
+
+    merged_config.apply(access_token.clone(), owner, repo).await?;
+
+    Ok(())
+}
+
+fn merge_config(first: RepoConfig, second: RepoConfig) -> RepoConfig {
+    RepoConfig {
+        teams: Some(merge_option_hashmap(first.teams, second.teams)),
+        collaborators: Some(merge_option_hashmap(
+            first.collaborators,
+            second.collaborators,
+        )),
+    }
+}
+
+fn merge_option_hashmap<K, V>(
+    map1: Option<HashMap<K, V>>,
+    map2: Option<HashMap<K, V>>,
+) -> HashMap<K, V>
+where
+    K: std::cmp::Eq + std::hash::Hash,
+{
+    if let Some(map1) = map1 {
+        if let Some(map2) = map2 {
+            map1.into_iter().chain(map2.into_iter()).collect()
+        } else {
+            map1
+        }
+    } else {
+        if let Some(map2) = map2 {
+            map2
+        } else {
+            HashMap::new()
+        }
+    }
 }
 
 fn permission_from_s(s: &String) -> Option<Permission> {
@@ -67,7 +147,7 @@ impl RepoConfig {
         owner: String,
         repo_name: String,
     ) -> anyhow::Result<()> {
-        println!("Applying configuration");
+        debug!("Applying configuration");
         let octocrab = OctocrabBuilder::default()
             .personal_token(access_token.clone())
             .build()?;
@@ -97,29 +177,29 @@ impl RepoConfig {
 async fn apply_teams(
     octocrab: &octocrab::Octocrab,
     owner: &String,
-    repo_name: &String,
+    repo: &String,
     team_permissions: &HashMap<String, String>,
 ) -> anyhow::Result<()> {
-    println!("Applying teams");
+    debug!("Applying teams");
     for (team_slug, permission_s) in team_permissions {
         let permission = permission_from_s(permission_s).unwrap();
 
         match octocrab
             .teams(owner)
             .repos(team_slug)
-            .add_or_update(owner, repo_name, permission)
+            .add_or_update(owner, repo, permission)
             .await
         {
             Ok(_) => {
-                println!(
-                    "Added team {} with permission {:?} to repository {}/{}",
-                    team_slug, permission, owner, repo_name
+                info!(
+                    "Added team {team_slug} with permission {:?} to repository {owner}/{repo}",
+                    permission
                 );
             }
             Err(e) => {
-                println!(
-                    "Error adding team {} with permission {:?} to repository {}/{}: {}",
-                    team_slug, permission, owner, repo_name, e
+                error!(
+                    "Error adding team {team_slug} with permission {:?} to repository {owner}/{repo}: {:?}",
+                    permission, e
                 );
             }
         }
@@ -147,7 +227,7 @@ async fn apply_collaborators(
     repo: &String,
     collaborator_permissions: &HashMap<String, String>,
 ) -> anyhow::Result<()> {
-    println!("Applying collaborators");
+    debug!("Applying collaborators");
 
     for (username, permission_s) in collaborator_permissions {
         let permission = permission_from_s(permission_s).unwrap();
@@ -194,7 +274,7 @@ mod tests {
     /// We ignore this test for now as it requires a TEST_PERSONAL_ACCESS_TOKEN and
     /// performs actual GitHub API calls, until we can add some VCR-like HTTP recording
     /// in the future.
-    /// 
+    ///
     /// To run ignored tests locally, use `cargo test -- --ignored`
     #[tokio::test]
     #[ignore]
@@ -238,12 +318,4 @@ mod tests {
         assert!(repo.permissions.unwrap().maintain);
         Ok(())
     }
-}
-
-pub async fn config_apply(access_token: &String, owner: impl Into<String>, repo_name: impl Into<String>, config_files: &Vec<String>) -> Result<()> {
-    println!("Applying configuration to {}/{}", owner.into(), repo_name.into());
-    for config_file in config_files {
-        println!("Applying configuration from {config_file}");
-    }
-    Ok(())
 }
