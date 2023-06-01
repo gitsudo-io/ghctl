@@ -304,8 +304,8 @@ mod tests {
         () = repo_config
             .apply(
                 test_token.clone(),
-                "gitsudo-io".to_string(),
-                "test-repo-alpha".to_string(),
+                &"gitsudo-io".to_string(),
+                &"test-repo-alpha".to_string(),
             )
             .await?;
 
