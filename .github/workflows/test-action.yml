@@ -1,5 +1,7 @@
 name: Test the Action
-on: push
+on: 
+  push:
+  workflow_dispatch:    
 
 jobs:
   ghctl-repo-config-apply:
