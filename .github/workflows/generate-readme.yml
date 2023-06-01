@@ -5,6 +5,7 @@ on:
       - main
     paths:
       - action.yml
+      - .github/generate-readme.yml
       - .github/README.md.erb
 
 jobs:
