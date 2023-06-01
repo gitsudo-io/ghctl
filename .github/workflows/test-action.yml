@@ -12,5 +12,7 @@ jobs:
         with:
             args: version
       - uses: gitsudo-io/ghctl@main
+        env:
+          RUST_LOG: ghctl=debug
         with:
-            args: repo config apply gitsudo-io/ghctl -F test/ghctl.yaml -v --access-token ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+            args: repo config apply gitsudo-io/ghctl -F test/ghctl.yaml --access-token ${{ secrets.PERSONAL_ACCESS_TOKEN }}
