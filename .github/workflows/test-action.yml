@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: gitsudo-io/ghctl
+      - uses: gitsudo-io/ghctl@main
         with:
             args: |
                 --access-token ${{ secrets.GITHUB_TOKEN }}
