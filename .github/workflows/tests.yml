@@ -1,5 +1,10 @@
 name: Tests
-on: push
+on:
+  push:
+    paths:
+      - "src/**"
+      - "Cargo.*"
+      - "test/**"
 
 jobs:
   test:
