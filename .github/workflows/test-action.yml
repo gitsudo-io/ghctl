@@ -10,4 +10,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: gitsudo-io/ghctl@main
         with:
+            args: version
+      - uses: gitsudo-io/ghctl@main
+        with:
             args: repo config apply gitsudo-io/ghctl -F test/ghctl.yaml -vv --access-token ${{ secrets.PERSONAL_ACCESS_TOKEN }}
