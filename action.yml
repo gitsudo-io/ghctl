@@ -14,6 +14,7 @@ runs:
       with:
         repo: gitsudo-io/ghctl
         file: ghctl
+        version: v0.1.1
         target: /usr/local/bin/ghctl
     - shell: bash
       run: |
