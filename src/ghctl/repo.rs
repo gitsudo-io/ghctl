@@ -1,6 +1,6 @@
 use anyhow::Result;
-use http::HeaderName;
-use log::{debug, info, error};
+use http::{HeaderName, StatusCode};
+use log::{debug, error, info};
 use octocrab::models::Repository;
 use octocrab::params::teams::Permission;
 use octocrab::OctocrabBuilder;
@@ -51,30 +51,32 @@ pub async fn config_apply(
         return Ok(());
     }
 
-    let merged_config = config_files
-        .iter()
-        .try_fold(RepoConfig::new(), |config, config_file| {
-            debug!("Reading configuration file {config_file}");
-            match std::fs::File::open(config_file) {
-                Ok(f) => {
-                    match serde_yaml::from_reader(f) {
+    let merged_config =
+        config_files
+            .iter()
+            .try_fold(RepoConfig::new(), |config, config_file| {
+                debug!("Reading configuration file {config_file}");
+                match std::fs::File::open(config_file) {
+                    Ok(f) => match serde_yaml::from_reader(f) {
                         Ok(repo_config) => Ok(merge_config(config, repo_config)),
                         Err(e) => {
                             error!("Error deserializing configuration file {config_file}: {e}");
                             Err(anyhow::anyhow!(e))
                         }
+                    },
+                    Err(e) => {
+                        error!("Error reading configuration file {config_file}: {e}");
+                        Err(anyhow::anyhow!(e))
                     }
-                },
-                Err(e) => {
-                    error!("Error reading configuration file {config_file}: {e}");
-                    Err(anyhow::anyhow!(e))
-                }                
-            }
-        })?;
+                }
+            })?;
 
     debug!("Applying merged configuration: {:?}", merged_config);
 
-    match merged_config.apply(access_token.clone(), &owner, &repo).await {
+    match merged_config
+        .apply(access_token.clone(), &owner, &repo)
+        .await
+    {
         Ok(_) => {
             debug!("Applied configuration to {owner}/{repo}");
         }
@@ -247,14 +249,27 @@ async fn apply_collaborators(
         let result = octocrab._put(route, Some(&body)).await;
 
         match result {
-            Ok(resp) => {
-                info!(
-                    "Added collaborator {username} with permission {value} to repository {owner}/{repo}"
-                );
-                debug!("Response: {}", resp.status());
-                let body = hyper::body::to_bytes(resp.into_body()).await?;
-                debug!("{}", String::from_utf8(body.to_vec())?);
-            }
+            Ok(resp) => match resp.status() {
+                StatusCode::OK | StatusCode::CREATED => {
+                    info!(
+                            "Added collaborator {username} with permission {value} to repository {owner}/{repo}"
+                        );
+                    let body = hyper::body::to_bytes(resp.into_body()).await?;
+                    println!("{}", String::from_utf8(body.to_vec())?);
+                }
+                StatusCode::NO_CONTENT => {
+                    info!(
+                            "Updated collaborator {username} with permission {value} to repository {owner}/{repo}"
+                        );
+                }
+                _ => {
+                    debug!("Response: {}", resp.status());
+                    error!(
+                            "Error updating collaborator {username} with permission {value} to repository {owner}/{repo}: {e}"
+                        );
+                    return Err(anyhow::anyhow!(resp.status()));
+                }
+            },
             Err(e) => {
                 error!(
                     "Error adding collaborator {username} with permission {value} to repository {owner}/{repo}: {e}"
