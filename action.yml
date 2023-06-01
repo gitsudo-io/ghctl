@@ -7,7 +7,15 @@ inputs:
     required: true
 
 runs:
-  using: docker
-  image: action.Dockerfile
-  args:
-    - ${{ inputs.args}}
+  using: composite
+  steps:
+    - uses: actions/checkout@v3
+    - uses: dsaltares/fetch-gh-release-asset@master
+      with:
+        repo: gitsudo-io/ghctl
+        version: tags/v0.1.0
+        file: ghctl
+        target: /usr/local/bin/ghctl
+        token: ${{ secrets.GITHUB_TOKEN }}
+    - shell: bash
+      run: ghctl ${{ inputs.args }}
