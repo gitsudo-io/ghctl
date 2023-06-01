@@ -1,0 +1,13 @@
+name: "ghctl"
+description: "GitHub Action for ghctl"
+inputs:
+  args:
+    description: >-
+      Program arguments
+    required: true
+
+runs:
+  using: docker
+  image: action.Dockerfile
+  args:
+    - ${{ inputs.args}}

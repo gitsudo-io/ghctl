@@ -1,0 +1,13 @@
+name: Test the Action
+on: push
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: gitsudo-io/ghctl
+        with:
+            args: |
+                --access-token ${{ secrets.GITHUB_TOKEN }}
+                repo config apply gitsudo/ghctl -F test/ghctl.yaml
