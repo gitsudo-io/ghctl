@@ -46,6 +46,7 @@ fn maybe_get_github_token_env_var() -> Result<String> {
 pub async fn cli(opts: Opts) {
     env_logger::builder()
         .filter_level(opts.verbose.log_level_filter())
+        .target(env_logger::Target::Stdout)
         .init();
     match build_context(opts) {
         Ok(context) => match &context.opts.command {
