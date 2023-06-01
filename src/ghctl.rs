@@ -1,6 +1,10 @@
 ///! This module defines actual code that executes the ghctl commands.
 pub mod repo;
 
+use log::error;
+use std::env::VarError;
+use std::process::exit;
+
 use crate::commands;
 use crate::commands::{Commands, Opts};
 use anyhow::Result;
@@ -28,17 +32,25 @@ fn get_access_token(opts: &Opts) -> Result<String> {
 fn maybe_get_github_token_env_var() -> Result<String> {
     match std::env::var("GITHUB_TOKEN") {
         Ok(access_token) => Ok(access_token),
-        Err(e) => Err(anyhow::anyhow!(e)),
+        Err(e) => match e {
+            VarError::NotPresent => {
+                error!("No access token provided and GITHUB_TOKEN environment variable not set, aborting.");
+                exit(1)
+            },
+            _ => Err(anyhow::anyhow!(e))
+        },
     }
 }
 
 /// Run the ghctl CLI
 pub async fn cli(opts: Opts) {
+    env_logger::builder()
+        .filter_level(opts.verbose.log_level_filter())
+        .init();
     match build_context(opts) {
         Ok(context) => match &context.opts.command {
             Commands::Repo(repo) => commands::repo::repo(&context, repo).await,
         },
-        Err(e) => println!("Error: {}", e),
+        Err(e) => error!("Error: {}", e),
     }
 }
- 

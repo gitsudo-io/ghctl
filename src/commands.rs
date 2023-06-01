@@ -2,6 +2,7 @@
 pub mod repo;
 
 use clap::{Parser, Subcommand};
+use clap_verbosity_flag::{Verbosity, InfoLevel};
 use repo::RepoCommand;
 
 /// The top level clap parser and CLI arguments
@@ -13,6 +14,9 @@ use repo::RepoCommand;
 pub struct Opts {
     #[arg(long = "access-token", global = true, help = "GitHub access token")]
     pub access_token: Option<String>,
+
+    #[command(flatten)]
+    pub verbose: Verbosity<InfoLevel>,
 
     #[command(subcommand)]
     pub command: Commands,

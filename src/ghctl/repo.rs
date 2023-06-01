@@ -47,7 +47,7 @@ pub async fn config_apply(
     debug!("Applying configuration to {owner}/{repo}");
 
     if config_files.len() == 0 {
-        println!("No configuration files specified! Please specify one or more configuration files with -F/--config-file");
+        error!("No configuration files specified! Please specify one or more configuration files with -F/--config-file");
         return Ok(());
     }
 
@@ -74,7 +74,15 @@ pub async fn config_apply(
 
     debug!("Applying merged configuration: {:?}", merged_config);
 
-    merged_config.apply(access_token.clone(), owner, repo).await?;
+    match merged_config.apply(access_token.clone(), &owner, &repo).await {
+        Ok(_) => {
+            debug!("Applied configuration to {owner}/{repo}");
+        }
+        Err(e) => {
+            error!("Error applying configuration to {owner}/{repo}: {e}");
+            return Err(anyhow::anyhow!(e));
+        }
+    };
 
     Ok(())
 }
@@ -144,8 +152,8 @@ impl RepoConfig {
     pub async fn apply(
         &self,
         access_token: String,
-        owner: String,
-        repo_name: String,
+        owner: &String,
+        repo_name: &String,
     ) -> anyhow::Result<()> {
         debug!("Applying configuration");
         let octocrab = OctocrabBuilder::default()
@@ -233,21 +241,22 @@ async fn apply_collaborators(
         let permission = permission_from_s(permission_s).unwrap();
         let value = permission_to_s(&permission);
         let route = format!("/repos/{owner}/{repo}/collaborators/{username}");
-        println!("route: {route}");
+
         let body = serde_json::json!({ "permission": value });
 
         let result = octocrab._put(route, Some(&body)).await;
 
         match result {
             Ok(resp) => {
-                println!(
+                info!(
                     "Added collaborator {username} with permission {value} to repository {owner}/{repo}"
                 );
-                println!("Response: {}", resp.status());
-                println!("Response: {:?}", resp.body());
+                debug!("Response: {}", resp.status());
+                let body = hyper::body::to_bytes(resp.into_body()).await?;
+                debug!("{}", String::from_utf8(body.to_vec())?);
             }
             Err(e) => {
-                println!(
+                error!(
                     "Error adding collaborator {username} with permission {value} to repository {owner}/{repo}: {e}"
                 );
                 return Err(e.into());

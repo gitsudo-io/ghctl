@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::{Args, Subcommand};
+use log::{error, info};
 
 use crate::ghctl;
 use crate::utils::split_repo_full_name;
@@ -55,7 +56,7 @@ pub async fn repo(context: &ghctl::Context, repo: &RepoCommand) {
             let (owner, repo_name) = split_repo_full_name(repo_name).unwrap();
             match crate::ghctl::repo::get_repo(&context.access_token, owner, repo_name).await {
                 Ok(repo) => println!("{}", serde_json::to_string_pretty(&repo).unwrap()),
-                Err(e) => println!("Error: {}", e),
+                Err(e) => error!("Error: {}", e),
             }
         }
 
@@ -73,8 +74,8 @@ pub async fn config(context: &ghctl::Context, repo_config: &RepoConfigCommand) -
         RepoConfigSubcommand::Apply { repo_full_name, config_files } => {
             let (owner, repo_name) = split_repo_full_name(repo_full_name).unwrap();
             match ghctl::repo::config_apply(&context.access_token, owner, repo_name, config_files).await {
-                Ok(_) => println!("Applied configuration to {}", repo_full_name.as_ref().unwrap()),
-                Err(e) => println!("Error: {}", e),
+                Ok(_) => info!("Applied configuration to {}", repo_full_name.as_ref().unwrap()),
+                Err(e) => error!("Error: {}", e),
             }
            Ok(())
         }

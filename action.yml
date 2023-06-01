@@ -16,5 +16,9 @@ runs:
         version: tags/v0.1.0
         file: ghctl
         target: /usr/local/bin/ghctl
+    - uses: actions-rust-lang/setup-rust-toolchain@v1
     - shell: bash
-      run: ghctl ${{ inputs.args }}
+      run: |
+        cargo build --release
+        mv target/release/ghctl /usr/local/bin/ghctl
+        ghctl ${{ inputs.args }}
