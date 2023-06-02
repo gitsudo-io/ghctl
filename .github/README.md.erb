@@ -8,6 +8,7 @@ ghctl is both a command-line utility for GitHub, _and_ a GitHub Action that allo
 
 > NOTE: ghctl is in early development and is not yet ready for production use. However, please feel free to try it out and provide feedback!
 
+
 ## ghctl CLI
 
 ghctl currently requires a GitHub Personal Access Token (PAT) with at least the following scopes:
@@ -19,11 +20,36 @@ ghctl currently requires a GitHub Personal Access Token (PAT) with at least the 
 You can provide the access token to ghctl in one of the following ways:
 
   - set the `$GITHUB_TOKEN` environment variable
-  - explicitly pass the `--access-token` option to ghctl
+  - explicitly pass it using the `--access-token` option
 
-### Local Development
 
-To build and install the `ghctl` binary locally, you will need to have Rust 1.66.0 or later ([rustup](https://rustup.rs/)) installed.
+### Download the latest release binary 
+
+You can download the latest release binary (built for Debian Bookworm / Ubuntu 22.04 ) from the [Releases](https://github.com/gitsudo-io/ghctl/releases) page, using the GitHub CLI (`gh`) or just `curl`:
+
+```
+gh release download -R gitsudo-io/ghctl --pattern ghctl
+```
+
+```
+curl -L https://github.com/gitsudo-io/ghctl/releases/download/v0.1.3/ghctl > ghctl
+```
+
+Then make the file executable (`chmod u+x ghctl`) and place it in your `$PATH`.
+
+
+### Install using Cargo
+
+To install the `ghctl` binary using Cargo, you will need to have Rust 1.66.0 or later installed ([rustup](https://rustup.rs/)).
+
+```bash
+cargo install ghctl
+```
+
+
+### Local Development / Installation from source
+
+To build and install the `ghctl` binary locally, you will need to have Rust 1.66.0 or later installed ([rustup](https://rustup.rs/)).
 
 Clone this repository
 
@@ -36,6 +62,7 @@ Build and install the `ghctl` binary
 ```bash
 cargo install --path ghctl
 ```
+
 
 ### Usage
 
@@ -57,11 +84,13 @@ ghctl repo get gitsudo-io/ghctl
 ...
 ```
 
+
 #### Apply a GitHub repository configuration to a repository
 
 `ghctl repo apply "{owner}/{repo}" --config-file {config_file}` will read the specified YAML configuration file and apply it to the specified GitHub repository.
 
 The configuration file should be a YAML file and currently supports the following sections:
+
 
 ##### Repository team permissions
 
@@ -100,6 +129,7 @@ collaborators:
 
 When applied to a repository, will grant the user `aisrael` `admin` permissions to the repository.
 
+
 ##### Full example
 
 Given a `ghctl.yaml` file containing:
@@ -114,11 +144,12 @@ collaborators:
 When we execute:
 
 ```bash
-$ ghctl repo config apply gitsudo-io/ghctl --access-token ${TEST_PERSONAL_ACCESS_TOKEN} -F ghctl.yaml
-[2023-06-01T21:46:06Z INFO  ghctl::ghctl::repo] Added team a-team with permission Maintain to repository gitsudo-io/ghctl
-[2023-06-01T21:46:06Z INFO  ghctl::ghctl::repo] Updated collaborator aisrael with permission admin to repository gitsudo-io/ghctl
-[2023-06-01T21:46:06Z INFO  ghctl::commands::repo] Applied configuration to gitsudo-io/ghctl
+$ ghctl repo config apply gitsudo-io/ghctl --access-token ${PERSONAL_ACCESS_TOKEN} -F ghctl.yaml
+[2023-06-01T21:46:06Z INFO ] Added team a-team with permission Maintain to repository gitsudo-io/ghctl
+[2023-06-01T21:46:06Z INFO ] Updated collaborator aisrael with permission admin to repository gitsudo-io/ghctl
+[2023-06-01T21:46:06Z INFO ] Applied configuration to gitsudo-io/ghctl
 ```
+
 
 ## ghctl GitHub Action
 
