@@ -49,6 +49,8 @@ pub async fn cli(opts: Opts) {
         _ => {
             env_logger::builder()
                 .filter_level(opts.verbose.log_level_filter())
+                .format_target(false)
+                .format_timestamp_secs()
                 .target(env_logger::Target::Stdout)
                 .init();
             match build_context(opts) {
