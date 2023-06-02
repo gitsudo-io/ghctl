@@ -2,6 +2,13 @@
 name = "ghctl"
 version = "0.1.3"
 edition = "2021"
+description = "A GitHub command line utility"
+documentation = "https://docs.rs/ghctl"
+readme = "README.md"
+homepage = "https://github.com/gitsudo-io/ghctl"
+repository = "https://github.com/gitsudo-io/ghctl"
+license = "MIT"
+license-file "LICENSE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
