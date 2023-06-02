@@ -8,7 +8,7 @@ readme = "README.md"
 homepage = "https://github.com/gitsudo-io/ghctl"
 repository = "https://github.com/gitsudo-io/ghctl"
 license = "MIT"
-license-file "LICENSE"
+license-file = "LICENSE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
