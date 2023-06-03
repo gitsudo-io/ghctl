@@ -17,8 +17,13 @@ pub struct RepoCommand {
 pub enum RepoSubcommand {
     #[command(about = "Apply repository configuration")]
     Get {
-        #[arg(help = "The repository full name, e.g. 'aisrael/ghctl'")]
+        #[arg(help = "The repository full name, e.g. 'gitsudo-io/ghctl'")]
         repo_name: Option<String>,
+    },
+    #[command(about = "Manage repository environments")]
+    Environments {
+        #[command(subcommand)]
+        command: RepoEnvironmentsSubcomand,
     },
     Config(RepoConfigCommand),
 }
@@ -33,12 +38,12 @@ pub struct RepoConfigCommand {
 pub enum RepoConfigSubcommand {
     #[command(about = "Retrieve repository configuration")]
     Get {
-        #[arg(help = "The repository full name, e.g. 'aisrael/ghctl'")]
+        #[arg(help = "The repository full name, e.g. 'gitsudo-io/ghctl'")]
         repo_full_name: Option<String>,
     },
     #[command(about = "Apply repository configuration")]
     Apply {
-        #[arg(help = "The repository full name, e.g. 'aisrael/ghctl'")]
+        #[arg(help = "The repository full name, e.g. 'gitsudo-io/ghctl'")]
         repo_full_name: Option<String>,
 
         #[arg(
@@ -50,6 +55,22 @@ pub enum RepoConfigSubcommand {
     },
 }
 
+#[derive(Subcommand, Debug)]
+pub enum RepoEnvironmentsSubcomand {
+    #[command(about = "List environments")]
+    List {
+        #[arg(help = "The repository full name, e.g. 'gitsudo-io/ghctl'")]
+        repo_name: String,
+    },
+    #[command(about = "Get an environment")]
+    Get {
+        #[arg(help = "The repository full name, e.g. 'gitsudo-io/ghctl'")]
+        repo_name: Option<String>,
+        #[arg(help = "The environment name")]
+        environment_name: String,
+    },
+}
+
 pub async fn repo(context: &ghctl::Context, repo: &RepoCommand) {
     match &repo.command {
         RepoSubcommand::Get { repo_name } => {
@@ -58,7 +79,16 @@ pub async fn repo(context: &ghctl::Context, repo: &RepoCommand) {
                 Ok(repo) => println!("{}", serde_json::to_string_pretty(&repo).unwrap()),
                 Err(e) => error!("Error: {}", e),
             }
-        }
+        },
+
+        RepoSubcommand::Environments { command } => match command {
+            RepoEnvironmentsSubcomand::List { repo_name } => {
+                ghctl::repo::config_environments_list(&context, &repo_name).await
+            }
+            RepoEnvironmentsSubcomand::Get { repo_name, environment_name } => {
+                ghctl::repo::config_environments_get(&context, &repo_name, &environment_name).await
+            }
+        },
 
         RepoSubcommand::Config(command) => {
             config(&context, command).await.unwrap();
@@ -71,7 +101,6 @@ pub async fn config(context: &ghctl::Context, repo_config: &RepoConfigCommand) -
         RepoConfigSubcommand::Get { repo_full_name } => {
             ghctl::repo::get_repo_config(&context, repo_full_name.as_ref().unwrap()).await
         }
-
         RepoConfigSubcommand::Apply {
             repo_full_name,
             config_files,

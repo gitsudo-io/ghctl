@@ -7,6 +7,8 @@ use octocrab::OctocrabBuilder;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::utils::split_some_repo_full_name;
+
 /// A struct that represents the ghctl configuration for a GitHub repository
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RepoConfig {
@@ -25,6 +27,52 @@ pub async fn get_repo(
 
     let repository = octocrab.repos(owner, repo_name).get().await?;
     Ok(repository)
+}
+
+pub async fn config_environments_list(context: &crate::ghctl::Context, repo_name: &String) {
+    do_config_environments_list(context, repo_name)
+        .await
+        .unwrap();
+}
+
+async fn do_config_environments_list(
+    context: &crate::ghctl::Context,
+    repo_name: &String,
+) -> Result<()> {
+    let (owner, repo) = split_some_repo_full_name(repo_name)?;
+
+    let octocrab = OctocrabBuilder::default()
+        .personal_token(context.access_token.clone())
+        .add_header(
+            HeaderName::from_static("accept"),
+            "application/vnd.github+json".to_string(),
+        )
+        .add_header(
+            HeaderName::from_static("x-github-api-version"),
+            "2022-11-28".to_string(),
+        )
+        .build()?;
+
+    let none: Option<&()> = None;
+    let result: Result<serde_json::Value, octocrab::Error> = octocrab
+        .get(format!("/repos/{owner}/{repo}/environments"), none)
+        .await;
+
+    match result {
+        Ok(body) => {
+            println!("{}", body);
+        }
+        Err(e) => error!("Error: {}", e),
+    }
+
+    Ok(())
+}
+
+pub async fn config_environments_get(
+    context: &crate::ghctl::Context,
+    repo_name: &Option<String>,
+    environment_name: &String,
+) {
 }
 
 pub async fn get_repo_config(
