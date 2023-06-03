@@ -65,7 +65,7 @@ pub enum RepoEnvironmentsSubcomand {
     #[command(about = "Get an environment")]
     Get {
         #[arg(help = "The repository full name, e.g. 'gitsudo-io/ghctl'")]
-        repo_name: Option<String>,
+        repo_name: String,
         #[arg(help = "The environment name")]
         environment_name: String,
     },

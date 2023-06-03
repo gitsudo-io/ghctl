@@ -70,9 +70,42 @@ async fn do_config_environments_list(
 
 pub async fn config_environments_get(
     context: &crate::ghctl::Context,
-    repo_name: &Option<String>,
+    repo_name: &String,
     environment_name: &String,
 ) {
+    do_config_environments_get(context, repo_name, environment_name)
+        .await
+        .unwrap();
+}
+
+async fn do_config_environments_get(context: &crate::ghctl::Context, repo_name: &String, environment_name: &String) -> Result<()> {
+    let (owner, repo) = split_some_repo_full_name(repo_name)?;
+
+    let octocrab = OctocrabBuilder::default()
+        .personal_token(context.access_token.clone())
+        .add_header(
+            HeaderName::from_static("accept"),
+            "application/vnd.github+json".to_string(),
+        )
+        .add_header(
+            HeaderName::from_static("x-github-api-version"),
+            "2022-11-28".to_string(),
+        )
+        .build()?;
+
+    let none: Option<&()> = None;
+    let result: Result<serde_json::Value, octocrab::Error> = octocrab
+        .get(format!("/repos/{owner}/{repo}/environments/{environment_name}", environment_name=environment_name), none)
+        .await;
+
+    match result {
+        Ok(body) => {
+            println!("{}", body);
+        }
+        Err(e) => error!("Error: {}", e),
+    }
+
+    Ok(())
 }
 
 pub async fn get_repo_config(
