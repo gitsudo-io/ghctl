@@ -5,7 +5,7 @@ use octocrab::models::Repository;
 use octocrab::params::teams::Permission;
 use octocrab::OctocrabBuilder;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, hash::Hash};
+use std::{collections::HashMap};
 
 use crate::utils::split_some_repo_full_name;
 
@@ -14,7 +14,7 @@ use crate::utils::split_some_repo_full_name;
 pub struct RepoConfig {
     pub teams: Option<HashMap<String, String>>,
     pub collaborators: Option<HashMap<String, String>>,
-    pub environments: Option<HashMap<String, RepoEnvironment>>,    
+    pub environments: Option<HashMap<String, RepoEnvironment>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -430,9 +430,7 @@ struct EnvironmentReviewer {
 
 impl CreateOrUpdateEnvironmentRequest {
     pub fn new() -> CreateOrUpdateEnvironmentRequest {
-        CreateOrUpdateEnvironmentRequest {
-            reviewers: None,
-        }
+        CreateOrUpdateEnvironmentRequest { reviewers: None }
     }
 }
 
@@ -447,12 +445,10 @@ async fn apply_environments(
     for (environment_name, repo_environment) in environments {
         let route = format!("/repos/{owner}/{repo}/environments/{environment_name}");
 
-        let request_data = CreateOrUpdateEnvironmentRequest::new();
-        
+        let _request_data = CreateOrUpdateEnvironmentRequest::new();
+
         if let Some(reviewers) = &repo_environment.reviewers {
-            for reviewer in reviewers {
-                
-            }
+            for _reviewer in reviewers {}
         }
 
         let body = serde_json::json!({"reviewers": [{"type":"User","id":89215}]});
@@ -515,9 +511,8 @@ mod tests {
     #[ignore]
     async fn test_repo_config() -> Result<(), Box<dyn std::error::Error>> {
         env_logger::builder()
-        .target(env_logger::Target::Stdout)
-        .init();
-
+            .target(env_logger::Target::Stdout)
+            .init();
 
         let repo_config = serde_yaml::from_str::<super::RepoConfig>(
             r#"

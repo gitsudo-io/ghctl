@@ -79,13 +79,16 @@ pub async fn repo(context: &ghctl::Context, repo: &RepoCommand) {
                 Ok(repo) => println!("{}", serde_json::to_string_pretty(&repo).unwrap()),
                 Err(e) => error!("Error: {}", e),
             }
-        },
+        }
 
         RepoSubcommand::Environments { command } => match command {
             RepoEnvironmentsSubcomand::List { repo_name } => {
                 ghctl::repo::config_environments_list(&context, &repo_name).await
             }
-            RepoEnvironmentsSubcomand::Get { repo_name, environment_name } => {
+            RepoEnvironmentsSubcomand::Get {
+                repo_name,
+                environment_name,
+            } => {
                 ghctl::repo::config_environments_get(&context, &repo_name, &environment_name).await
             }
         },
