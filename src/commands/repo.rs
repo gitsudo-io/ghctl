@@ -83,18 +83,18 @@ pub async fn repo(context: &ghctl::Context, repo: &RepoCommand) {
 
         RepoSubcommand::Environments { command } => match command {
             RepoEnvironmentsSubcomand::List { repo_name } => {
-                ghctl::repo::environments_list(&context, &repo_name).await
+                ghctl::repo::environments_list(context, repo_name).await
             }
             RepoEnvironmentsSubcomand::Get {
                 repo_name,
                 environment_name,
             } => {
-                ghctl::repo::environments_get(&context, &repo_name, &environment_name).await
+                ghctl::repo::environments_get(context, repo_name, environment_name).await
             }
         },
 
         RepoSubcommand::Config(command) => {
-            config(&context, command).await.unwrap();
+            config(context, command).await.unwrap();
         }
     }
 }
@@ -102,7 +102,7 @@ pub async fn repo(context: &ghctl::Context, repo: &RepoCommand) {
 pub async fn config(context: &ghctl::Context, repo_config: &RepoConfigCommand) -> Result<()> {
     match &repo_config.command {
         RepoConfigSubcommand::Get { repo_full_name } => {
-            ghctl::repo::config::get(&context, repo_full_name.as_ref().unwrap()).await
+            ghctl::repo::config::get(context, repo_full_name.as_ref().unwrap()).await
         }
         RepoConfigSubcommand::Apply {
             repo_full_name,

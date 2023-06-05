@@ -31,7 +31,7 @@ pub async fn get(
 
 
 pub async fn apply(
-    access_token: &String,
+    access_token: &str,
     owner: impl Into<String>,
     repo: impl Into<String>,
     config_files: &Vec<String>,
@@ -40,7 +40,7 @@ pub async fn apply(
     let repo = repo.into();
     debug!("Applying configuration to {owner}/{repo}");
 
-    if config_files.len() == 0 {
+    if config_files.is_empty() {
         error!("No configuration files specified! Please specify one or more configuration files with -F/--config-file");
         return Ok(());
     }
@@ -68,7 +68,7 @@ pub async fn apply(
     debug!("Applying merged configuration: {:?}", merged_config);
 
     match merged_config
-        .apply(access_token.clone(), &owner, &repo)
+        .apply(access_token.to_owned(), &owner, &repo)
         .await
     {
         Ok(_) => {
@@ -105,11 +105,7 @@ where
             Some(map1)
         }
     } else {
-        if let Some(map2) = map2 {
-            Some(map2)
-        } else {
-            None
-        }
+        map2
     }
 }
 
@@ -141,16 +137,12 @@ fn merge_environments(
             Some(map1)
         }
     } else {
-        if let Some(map2) = second {
-            Some(map2)
-        } else {
-            None
-        }
+        second
     }
 }
 
-fn permission_from_s(s: &String) -> Option<Permission> {
-    match s.as_str() {
+fn permission_from_s(s: &str) -> Option<Permission> {
+    match s {
         "pull" => Some(Permission::Pull),
         "triage" => Some(Permission::Triage),
         "push" => Some(Permission::Push),
@@ -192,7 +184,7 @@ impl RepoConfig {
             .build()?;
 
         if let Some(team_permissions) = &self.teams {
-            apply_teams(&octocrab, &owner, &repo_name, team_permissions).await?;
+            apply_teams(&octocrab, owner, repo_name, team_permissions).await?;
         }
 
         let octocrab = OctocrabBuilder::default()
@@ -207,11 +199,11 @@ impl RepoConfig {
             )
             .build()?;
         if let Some(collaborator_permissions) = &self.collaborators {
-            apply_collaborators(&octocrab, &owner, &repo_name, collaborator_permissions).await?;
+            apply_collaborators(&octocrab, owner, repo_name, collaborator_permissions).await?;
         }
 
         if let Some(environments) = &self.environments {
-            apply_environments(&octocrab, &owner, &repo_name, environments).await?;
+            apply_environments(&octocrab, owner, repo_name, environments).await?;
         }
         Ok(())
     }

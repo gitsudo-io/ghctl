@@ -11,12 +11,12 @@ pub use config::RepoConfig;
 use crate::utils::split_some_repo_full_name;
 
 pub async fn get_repo(
-    access_token: &String,
+    access_token: &str,
     owner: impl Into<String>,
     repo_name: impl Into<String>,
 ) -> Result<Repository> {
     let octocrab = OctocrabBuilder::default()
-        .personal_token(access_token.clone())
+        .personal_token(access_token.to_owned())
         .build()?;
 
     let repository = octocrab.repos(owner, repo_name).get().await?;
