@@ -5,7 +5,7 @@ use octocrab::models::Repository;
 use octocrab::params::teams::Permission;
 use octocrab::OctocrabBuilder;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash};
 
 use crate::utils::split_some_repo_full_name;
 
@@ -14,6 +14,12 @@ use crate::utils::split_some_repo_full_name;
 pub struct RepoConfig {
     pub teams: Option<HashMap<String, String>>,
     pub collaborators: Option<HashMap<String, String>>,
+    pub environments: Option<HashMap<String, RepoEnvironment>>,    
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RepoEnvironment {
+    reviewers: Option<Vec<String>>,
 }
 
 pub async fn get_repo(
@@ -78,7 +84,11 @@ pub async fn config_environments_get(
         .unwrap();
 }
 
-async fn do_config_environments_get(context: &crate::ghctl::Context, repo_name: &String, environment_name: &String) -> Result<()> {
+async fn do_config_environments_get(
+    context: &crate::ghctl::Context,
+    repo_name: &String,
+    environment_name: &String,
+) -> Result<()> {
     let (owner, repo) = split_some_repo_full_name(repo_name)?;
 
     let octocrab = OctocrabBuilder::default()
@@ -95,7 +105,13 @@ async fn do_config_environments_get(context: &crate::ghctl::Context, repo_name: 
 
     let none: Option<&()> = None;
     let result: Result<serde_json::Value, octocrab::Error> = octocrab
-        .get(format!("/repos/{owner}/{repo}/environments/{environment_name}", environment_name=environment_name), none)
+        .get(
+            format!(
+                "/repos/{owner}/{repo}/environments/{environment_name}",
+                environment_name = environment_name
+            ),
+            none,
+        )
         .await;
 
     match result {
@@ -172,32 +188,66 @@ pub async fn config_apply(
 
 fn merge_config(first: RepoConfig, second: RepoConfig) -> RepoConfig {
     RepoConfig {
-        teams: Some(merge_option_hashmap(first.teams, second.teams)),
-        collaborators: Some(merge_option_hashmap(
-            first.collaborators,
-            second.collaborators,
-        )),
+        teams: merge_option_hashmap(first.teams, second.teams),
+        collaborators: merge_option_hashmap(first.collaborators, second.collaborators),
+        environments: merge_environments(first.environments, second.environments),
     }
 }
 
 fn merge_option_hashmap<K, V>(
     map1: Option<HashMap<K, V>>,
     map2: Option<HashMap<K, V>>,
-) -> HashMap<K, V>
+) -> Option<HashMap<K, V>>
 where
     K: std::cmp::Eq + std::hash::Hash,
 {
     if let Some(map1) = map1 {
         if let Some(map2) = map2 {
-            map1.into_iter().chain(map2.into_iter()).collect()
+            Some(map1.into_iter().chain(map2.into_iter()).collect())
         } else {
-            map1
+            Some(map1)
         }
     } else {
         if let Some(map2) = map2 {
-            map2
+            Some(map2)
         } else {
-            HashMap::new()
+            None
+        }
+    }
+}
+
+fn merge_environments(
+    first: Option<HashMap<String, RepoEnvironment>>,
+    second: Option<HashMap<String, RepoEnvironment>>,
+) -> Option<HashMap<String, RepoEnvironment>> {
+    if let Some(map1) = first {
+        if let Some(mut map2) = second {
+            for (environment_name, repo_environment) in map1 {
+                if let Some(repo_environment2) = map2.get(&environment_name) {
+                    if let Some(reviewers) = &repo_environment.reviewers {
+                        if let Some(reviewers2) = &repo_environment2.reviewers {
+                            let reviewers =
+                                reviewers.iter().chain(reviewers2.iter()).cloned().collect();
+                            map2.insert(
+                                environment_name,
+                                RepoEnvironment {
+                                    reviewers: Some(reviewers),
+                                },
+                            );
+                        }
+                    }
+                }
+            }
+
+            Some(map2)
+        } else {
+            Some(map1)
+        }
+    } else {
+        if let Some(map2) = second {
+            Some(map2)
+        } else {
+            None
         }
     }
 }
@@ -227,8 +277,9 @@ fn permission_to_s(permission: &Permission) -> &str {
 impl RepoConfig {
     pub fn new() -> RepoConfig {
         RepoConfig {
-            teams: Some(HashMap::new()),
-            collaborators: Some(HashMap::new()),
+            teams: None,
+            collaborators: None,
+            environments: None,
         }
     }
 
@@ -260,6 +311,10 @@ impl RepoConfig {
             .build()?;
         if let Some(collaborator_permissions) = &self.collaborators {
             apply_collaborators(&octocrab, &owner, &repo_name, collaborator_permissions).await?;
+        }
+
+        if let Some(environments) = &self.environments {
+            apply_environments(&octocrab, &owner, &repo_name, environments).await?;
         }
         Ok(())
     }
@@ -362,6 +417,82 @@ async fn apply_collaborators(
     Ok(())
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct CreateOrUpdateEnvironmentRequest {
+    reviewers: Option<Vec<EnvironmentReviewer>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct EnvironmentReviewer {
+    r#type: String,
+    id: u64,
+}
+
+impl CreateOrUpdateEnvironmentRequest {
+    pub fn new() -> CreateOrUpdateEnvironmentRequest {
+        CreateOrUpdateEnvironmentRequest {
+            reviewers: None,
+        }
+    }
+}
+
+async fn apply_environments(
+    octocrab: &octocrab::Octocrab,
+    owner: &String,
+    repo: &String,
+    environments: &HashMap<String, RepoEnvironment>,
+) -> anyhow::Result<()> {
+    debug!("Applying environments");
+
+    for (environment_name, repo_environment) in environments {
+        let route = format!("/repos/{owner}/{repo}/environments/{environment_name}");
+
+        let request_data = CreateOrUpdateEnvironmentRequest::new();
+        
+        if let Some(reviewers) = &repo_environment.reviewers {
+            for reviewer in reviewers {
+                
+            }
+        }
+
+        let body = serde_json::json!({"reviewers": [{"type":"User","id":89215}]});
+
+        debug!("PUT {}\n{}", route, body);
+        let result = octocrab._put(route, Some(&body)).await;
+
+        match result {
+            Ok(resp) => match resp.status() {
+                StatusCode::OK | StatusCode::CREATED => {
+                    info!(
+                            "Created deployment environment {environment_name} in repository {owner}/{repo}"
+                        );
+                    let body = hyper::body::to_bytes(resp.into_body()).await?;
+                    println!("{}", String::from_utf8(body.to_vec())?);
+                }
+                StatusCode::NO_CONTENT => {
+                    info!(
+                            "Updated deployment environment {environment_name} in repository {owner}/{repo}"
+                        );
+                }
+                _ => {
+                    error!(
+                            "Error updating deployment environment {environment_name} in repository {owner}/{repo}: {}", resp.status()
+                        );
+                    return Err(anyhow::anyhow!(resp.status()));
+                }
+            },
+            Err(e) => {
+                error!(
+                    "Error creating deployment environment {environment_name} in repository {owner}/{repo}: {e}"
+                );
+                return Err(e.into());
+            }
+        }
+    }
+
+    Ok(())
+}
+
 impl Default for RepoConfig {
     fn default() -> Self {
         Self::new()
@@ -383,24 +514,34 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_repo_config() -> Result<(), Box<dyn std::error::Error>> {
+        env_logger::builder()
+        .target(env_logger::Target::Stdout)
+        .init();
+
+
         let repo_config = serde_yaml::from_str::<super::RepoConfig>(
             r#"
             teams:
                 a-team: maintain
             collaborators:
                 aisrael: admin
+            environments:
+                gigalixir:
+                    reviewers:
+                        - aisrael
+                        - gitsudo-io/a-team
             "#,
         )
         .unwrap();
         println!("repo_config: {:?}", repo_config);
 
-        let test_token = env::var("TEST_PERSONAL_ACCESS_TOKEN").unwrap();
+        let test_token = env::var("GITHUB_TOKEN").unwrap();
 
         () = repo_config
             .apply(
                 test_token.clone(),
                 &"gitsudo-io".to_string(),
-                &"test-repo-alpha".to_string(),
+                &"gitsudo".to_string(),
             )
             .await?;
 
@@ -415,11 +556,35 @@ mod tests {
         let repo = octocrab
             .teams("gitsudo-io")
             .repos("a-team")
-            .check_manages("gitsudo-io", "test-repo-alpha")
+            .check_manages("gitsudo-io", "gitsudo")
             .await?
             .unwrap();
         println!("{:?}", repo.permissions);
         assert!(repo.permissions.unwrap().maintain);
         Ok(())
+    }
+
+    #[test]
+    fn test_merge_environments() {
+        let prod1 = RepoEnvironment {
+            reviewers: Some(vec!["alice".to_string()]),
+        };
+        let first: HashMap<String, RepoEnvironment> =
+            HashMap::from([("production".to_string(), prod1)]);
+
+        let prod2 = RepoEnvironment {
+            reviewers: Some(vec!["bob".to_string()]),
+        };
+        let second: HashMap<String, RepoEnvironment> =
+            HashMap::from([("production".to_string(), prod2)]);
+
+        let merged = merge_environments(Some(first), Some(second)).unwrap();
+        assert!(merged.get("production").is_some());
+        let production = merged.get("production").unwrap();
+        assert!(production.reviewers.is_some());
+        let reviewers = production.reviewers.as_ref().unwrap();
+        assert_eq!(reviewers.len(), 2);
+        assert!(reviewers.contains(&"alice".to_string()));
+        assert!(reviewers.contains(&"bob".to_string()));
     }
 }
