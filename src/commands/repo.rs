@@ -83,13 +83,13 @@ pub async fn repo(context: &ghctl::Context, repo: &RepoCommand) {
 
         RepoSubcommand::Environments { command } => match command {
             RepoEnvironmentsSubcomand::List { repo_name } => {
-                ghctl::repo::config_environments_list(&context, &repo_name).await
+                ghctl::repo::environments_list(&context, &repo_name).await
             }
             RepoEnvironmentsSubcomand::Get {
                 repo_name,
                 environment_name,
             } => {
-                ghctl::repo::config_environments_get(&context, &repo_name, &environment_name).await
+                ghctl::repo::environments_get(&context, &repo_name, &environment_name).await
             }
         },
 
@@ -102,14 +102,14 @@ pub async fn repo(context: &ghctl::Context, repo: &RepoCommand) {
 pub async fn config(context: &ghctl::Context, repo_config: &RepoConfigCommand) -> Result<()> {
     match &repo_config.command {
         RepoConfigSubcommand::Get { repo_full_name } => {
-            ghctl::repo::get_repo_config(&context, repo_full_name.as_ref().unwrap()).await
+            ghctl::repo::config::get(&context, repo_full_name.as_ref().unwrap()).await
         }
         RepoConfigSubcommand::Apply {
             repo_full_name,
             config_files,
         } => {
             let (owner, repo_name) = split_repo_full_name(repo_full_name).unwrap();
-            match ghctl::repo::config_apply(&context.access_token, owner, repo_name, config_files)
+            match ghctl::repo::config::apply(&context.access_token, owner, repo_name, config_files)
                 .await
             {
                 Ok(_) => info!(
