@@ -1,4 +1,4 @@
-///! This module defines the commands, subcommands, and arguments for ghctl.
+//! This module defines the commands, subcommands, and arguments for ghctl.
 pub mod repo;
 
 use clap::{Parser, Subcommand};

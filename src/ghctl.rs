@@ -1,4 +1,4 @@
-///! This module defines actual code that executes the ghctl commands.
+//! This module defines actual code that executes the ghctl commands.
 pub mod repo;
 
 use log::error;
