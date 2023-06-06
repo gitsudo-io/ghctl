@@ -1,10 +1,10 @@
 use anyhow::Result;
 use http::{HeaderName, StatusCode};
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use octocrab::params::teams::Permission;
 use octocrab::OctocrabBuilder;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash};
 
 /// A struct that represents the ghctl configuration for a GitHub repository
 #[derive(Debug, Serialize, Deserialize)]
@@ -19,17 +19,14 @@ pub struct RepoEnvironment {
     pub reviewers: Option<Vec<String>>,
 }
 
-
-pub async fn get(
-    _context: &crate::ghctl::Context,
-    repo_full_name: &String,
-) -> Result<()> {
+/// The `repo config get` command
+pub async fn get(_context: &crate::ghctl::Context, repo_full_name: &String) -> Result<()> {
     error!("Not yet implemented: repo config get {}", repo_full_name);
 
     Ok(())
 }
 
-
+/// The `repo config apply` command
 pub async fn apply(
     access_token: &str,
     owner: impl Into<String>,
@@ -67,10 +64,7 @@ pub async fn apply(
 
     debug!("Applying merged configuration: {:?}", merged_config);
 
-    match merged_config
-        .apply(access_token.to_owned(), &owner, &repo)
-        .await
-    {
+    match merged_config.apply(access_token, &owner, &repo).await {
         Ok(_) => {
             debug!("Applied configuration to {owner}/{repo}");
         }
@@ -121,7 +115,7 @@ fn merge_environments(
                         if let Some(reviewers2) = &repo_environment2.reviewers {
                             let reviewers =
                                 reviewers.iter().chain(reviewers2.iter()).cloned().collect();
-                            map2.insert( 
+                            map2.insert(
                                 environment_name,
                                 RepoEnvironment {
                                     reviewers: Some(reviewers),
@@ -172,15 +166,89 @@ impl RepoConfig {
         }
     }
 
+    pub async fn validate_and_prefetch(
+        &self,
+        access_token: &str,
+        owner: &str,
+        repo_name: &str,
+    ) -> Result<(HashMap<String, u64>, HashMap<String, HashMap<String, u64>>)> {
+        let mut users = HashMap::new();
+
+        if let Some(collaborators) = self.collaborators.as_ref() {
+            for collaborator in collaborators.keys() {
+                debug!("Validating user {collaborator}");
+                let user = crate::github::get_user(access_token, collaborator).await?;
+                debug!("Found user {:?}", user);
+                users.insert(collaborator.clone(), user.id);
+            }
+        }
+
+        let mut orgs_teams: HashMap<String, HashMap<String, u64>> = HashMap::new();
+
+        let octocrab = OctocrabBuilder::default()
+            .personal_token(access_token.to_owned())
+            .build()?;
+
+        if let Some(teams) = self.teams.as_ref() {
+            let org = orgs_teams
+                .entry(owner.to_string())
+                .or_insert_with(|| HashMap::new());
+
+            for team_slug in teams.keys() {
+                debug!("Validating team {team_slug}");
+                let team = octocrab.teams(owner).get(team_slug).await?;
+                debug!("Found team \"{}\" ({})", team.name, team.id);
+                org.insert(team_slug.clone(), *team.id);
+            }
+        }
+
+        if let Some(environments) = self.environments.as_ref() {
+            for (_environment_name, repo_environment) in environments {
+                if let Some(reviewers) = &repo_environment.reviewers {
+                    for reviewer in reviewers {
+                        match reviewer.split_once('/') {
+                            Some((org, team_slug)) => {
+                                if org.is_empty() || team_slug.is_empty() {
+                                    warn!("Invalid {{org}}/{{team}} name: \"{}\"!", reviewer);
+                                } else {
+                                    let teams = orgs_teams
+                                        .entry(org.to_string())
+                                        .or_insert_with(|| HashMap::new());
+                                    if !teams.contains_key(team_slug) {
+                                        debug!("Validating team {team_slug}");
+                                        let team = octocrab.teams(org).get(team_slug).await?;
+                                        debug!("Found team \"{}\" ({})", team.name, team.id);
+                                        teams.insert(team_slug.to_string(), *team.id);
+                                    }
+                                }
+                            }
+
+                            None => {
+                                let user = crate::github::get_user(access_token, reviewer).await?;
+                                debug!("Found user {:?}", user);
+                                users.insert(reviewer.clone(), user.id);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok((users, orgs_teams))
+    }
+
     pub async fn apply(
         &self,
-        access_token: String,
+        access_token: &str,
         owner: &String,
         repo_name: &String,
     ) -> anyhow::Result<()> {
+        let (users, orgs_teams) = self
+            .validate_and_prefetch(access_token, owner, repo_name)
+            .await?;
         debug!("Applying configuration");
         let octocrab = OctocrabBuilder::default()
-            .personal_token(access_token.clone())
+            .personal_token(access_token.to_owned())
             .build()?;
 
         if let Some(team_permissions) = &self.teams {
@@ -188,7 +256,7 @@ impl RepoConfig {
         }
 
         let octocrab = OctocrabBuilder::default()
-            .personal_token(access_token)
+            .personal_token(access_token.to_owned())
             .add_header(
                 HeaderName::from_static("accept"),
                 "application/vnd.github+json".to_string(),
@@ -203,7 +271,8 @@ impl RepoConfig {
         }
 
         if let Some(environments) = &self.environments {
-            apply_environments(&octocrab, owner, repo_name, environments).await?;
+            apply_environments(&octocrab, owner, repo_name, environments, users, orgs_teams)
+                .await?;
         }
         Ok(())
     }
@@ -293,7 +362,6 @@ async fn apply_collaborators(
     Ok(())
 }
 
-
 #[derive(Debug, Serialize, Deserialize)]
 struct CreateOrUpdateEnvironmentRequest {
     reviewers: Option<Vec<EnvironmentReviewer>>,
@@ -309,6 +377,20 @@ impl CreateOrUpdateEnvironmentRequest {
     pub fn new() -> CreateOrUpdateEnvironmentRequest {
         CreateOrUpdateEnvironmentRequest { reviewers: None }
     }
+
+    pub fn add_reviewer(&mut self, r#type: &str, id: u64) {
+        if self.reviewers.is_none() {
+            self.reviewers = Some(vec![EnvironmentReviewer {
+                r#type: r#type.to_string(),
+                id,
+            }]);
+        } else {
+            self.reviewers.as_mut().unwrap().push(EnvironmentReviewer {
+                r#type: r#type.to_string(),
+                id,
+            });
+        }
+    }
 }
 
 async fn apply_environments(
@@ -316,19 +398,45 @@ async fn apply_environments(
     owner: &String,
     repo: &String,
     environments: &HashMap<String, RepoEnvironment>,
+    users: HashMap<String, u64>,
+    orgs_teams: HashMap<String, HashMap<String, u64>>,
 ) -> anyhow::Result<()> {
     debug!("Applying environments");
 
     for (environment_name, repo_environment) in environments {
         let route = format!("/repos/{owner}/{repo}/environments/{environment_name}");
 
-        let _request_data = CreateOrUpdateEnvironmentRequest::new();
+        let mut request_data = CreateOrUpdateEnvironmentRequest::new();
 
         if let Some(reviewers) = &repo_environment.reviewers {
-            for _reviewer in reviewers {}
+            for reviewer in reviewers {
+                match reviewer.split_once('/') {
+                    Some((org, team_slug)) => {
+                        if org.is_empty() || team_slug.is_empty() {
+                            warn!("Invalid {{org}}/{{team}} name: \"{}\"!", reviewer);
+                        } else {
+                            let teams = orgs_teams.get(org).unwrap();
+                            match teams.get(team_slug) {
+                                Some(id) => request_data.add_reviewer("Team", *id),
+                                None => {
+                                    warn!(
+                                        "Unknown team \"{}\" in organization \"{}\"",
+                                        team_slug, org
+                                    );
+                                }
+                            }
+                        }
+                    }
+
+                    None => match users.get(reviewer) {
+                        Some(id) => request_data.add_reviewer("User", *id),
+                        None => warn!("Unknown user \"{}\"", reviewer),
+                    },
+                }
+            }
         }
 
-        let body = serde_json::json!({"reviewers": [{"type":"User","id":89215}]});
+        let body = serde_json::json!(request_data);
 
         debug!("PUT {}\n{}", route, body);
         let result = octocrab._put(route, Some(&body)).await;
@@ -340,7 +448,7 @@ async fn apply_environments(
                             "Created deployment environment {environment_name} in repository {owner}/{repo}"
                         );
                     let body = hyper::body::to_bytes(resp.into_body()).await?;
-                    println!("{}", String::from_utf8(body.to_vec())?);
+                    debug!("{}", String::from_utf8(body.to_vec())?);
                 }
                 StatusCode::NO_CONTENT => {
                     info!(
@@ -374,6 +482,110 @@ impl Default for RepoConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ::http::header::HeaderName;
+    use octocrab::OctocrabBuilder;
+    use std::env;
+
+    /// We ignore this test for now as it requires an access token for testing and
+    /// performs actual GitHub API calls, until we can add some VCR-like HTTP recording
+    /// in the future.
+    ///
+    /// To run ignored tests locally, use `cargo test -- --ignored`
+    #[tokio::test]
+    #[ignore]
+    async fn test_validate_and_prefetch() -> Result<(), Box<dyn std::error::Error>> {
+        env_logger::builder()
+            .target(env_logger::Target::Stdout)
+            .init();
+        let github_token = env::var("GITHUB_TOKEN").unwrap();
+
+        let repo_config = serde_yaml::from_str::<super::RepoConfig>(
+            r#"
+            teams:
+                a-team: maintain
+            collaborators:
+                aisrael: admin
+            environments:
+                gigalixir:
+                    reviewers:
+                        - aisrael
+                        - gitsudo-io/infrastructure
+            "#,
+        )
+        .unwrap();
+        println!("repo_config: {:?}", repo_config);
+
+        let (users, teams) = repo_config
+            .validate_and_prefetch(&github_token, "gitsudo-io", "gitsudo")
+            .await?;
+        assert!(!users.is_empty());
+        assert!(*users.get("aisrael").unwrap() == 89215);
+
+        assert!(!teams.is_empty());
+        let gitsudo_io = teams.get("gitsudo-io").unwrap();
+        assert!(!gitsudo_io.is_empty());
+        assert!(*gitsudo_io.get("a-team").unwrap() == 7604587);
+        assert!(*gitsudo_io.get("infrastructure").unwrap() == 7924849);
+
+        Ok(())
+    }
+
+    /// We ignore this test for now as it requires an access token for testing and
+    /// performs actual GitHub API calls, until we can add some VCR-like HTTP recording
+    /// in the future.
+    ///
+    /// To run ignored tests locally, use `cargo test -- --ignored`
+    #[tokio::test]
+    #[ignore]
+    async fn test_repo_config() -> Result<(), Box<dyn std::error::Error>> {
+        env_logger::builder()
+            .target(env_logger::Target::Stdout)
+            .init();
+
+        let github_token = env::var("GITHUB_TOKEN").unwrap();
+
+        let repo_config = serde_yaml::from_str::<super::RepoConfig>(
+            r#"
+            teams:
+                a-team: maintain
+            collaborators:
+                aisrael: admin
+            environments:
+                gigalixir:
+                    reviewers:
+                        - aisrael
+                        - gitsudo-io/a-team
+            "#,
+        )
+        .unwrap();
+        println!("repo_config: {:?}", repo_config);
+
+        () = repo_config
+            .apply(
+                github_token.as_str(),
+                &"gitsudo-io".to_string(),
+                &"gitsudo".to_string(),
+            )
+            .await?;
+
+        let octocrab = OctocrabBuilder::default()
+            .personal_token(github_token)
+            .add_header(
+                HeaderName::from_static("accept"),
+                "application/vnd.github.v3.repository+json".to_string(),
+            )
+            .build()
+            .unwrap();
+        let repo = octocrab
+            .teams("gitsudo-io")
+            .repos("a-team")
+            .check_manages("gitsudo-io", "gitsudo")
+            .await?
+            .unwrap();
+        println!("{:?}", repo.permissions);
+        assert!(repo.permissions.unwrap().maintain);
+        Ok(())
+    }
 
     #[test]
     fn test_merge_environments() {

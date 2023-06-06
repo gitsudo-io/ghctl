@@ -1,4 +1,5 @@
 mod commands;
+mod github;
 mod ghctl;
 mod utils;
 
