@@ -1,6 +1,10 @@
 name: Test the Action
 on: 
   push:
+    paths-ignore:
+      - .github/README.md.erb
+      - README.md
+      - LICENSE
   workflow_dispatch:    
 
 jobs:
