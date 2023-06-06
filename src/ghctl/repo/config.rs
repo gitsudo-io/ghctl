@@ -4,7 +4,7 @@ use log::{debug, error, info, warn};
 use octocrab::params::teams::Permission;
 use octocrab::OctocrabBuilder;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, hash::Hash};
+use std::collections::HashMap;
 
 /// A struct that represents the ghctl configuration for a GitHub repository
 #[derive(Debug, Serialize, Deserialize)]
@@ -169,8 +169,7 @@ impl RepoConfig {
     pub async fn validate_and_prefetch(
         &self,
         access_token: &str,
-        owner: &str,
-        repo_name: &str,
+        owner: &str
     ) -> Result<(HashMap<String, u64>, HashMap<String, HashMap<String, u64>>)> {
         let mut users = HashMap::new();
 
@@ -192,7 +191,7 @@ impl RepoConfig {
         if let Some(teams) = self.teams.as_ref() {
             let org = orgs_teams
                 .entry(owner.to_string())
-                .or_insert_with(|| HashMap::new());
+                .or_insert_with(HashMap::new);
 
             for team_slug in teams.keys() {
                 debug!("Validating team {team_slug}");
@@ -203,7 +202,7 @@ impl RepoConfig {
         }
 
         if let Some(environments) = self.environments.as_ref() {
-            for (_environment_name, repo_environment) in environments {
+            for repo_environment in environments.values() {
                 if let Some(reviewers) = &repo_environment.reviewers {
                     for reviewer in reviewers {
                         match reviewer.split_once('/') {
@@ -213,7 +212,7 @@ impl RepoConfig {
                                 } else {
                                     let teams = orgs_teams
                                         .entry(org.to_string())
-                                        .or_insert_with(|| HashMap::new());
+                                        .or_insert_with(HashMap::new);
                                     if !teams.contains_key(team_slug) {
                                         debug!("Validating team {team_slug}");
                                         let team = octocrab.teams(org).get(team_slug).await?;
@@ -244,7 +243,7 @@ impl RepoConfig {
         repo_name: &String,
     ) -> anyhow::Result<()> {
         let (users, orgs_teams) = self
-            .validate_and_prefetch(access_token, owner, repo_name)
+            .validate_and_prefetch(access_token, owner)
             .await?;
         debug!("Applying configuration");
         let octocrab = OctocrabBuilder::default()
@@ -516,7 +515,7 @@ mod tests {
         println!("repo_config: {:?}", repo_config);
 
         let (users, teams) = repo_config
-            .validate_and_prefetch(&github_token, "gitsudo-io", "gitsudo")
+            .validate_and_prefetch(&github_token, "gitsudo-io")
             .await?;
         assert!(!users.is_empty());
         assert!(*users.get("aisrael").unwrap() == 89215);

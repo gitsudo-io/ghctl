@@ -1,7 +1,7 @@
 //! A collection of GitHub functions not provided by or building on top of the Octocrab library
 
 use anyhow::Result;
-use log::{debug, error};
+use log::error;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -34,10 +34,10 @@ pub async fn get_user(access_token: &str, username: &str) -> Result<Account> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use octocrab::OctocrabBuilder;
     use std::env;
 
     #[tokio::test]
+    #[ignore = "Don't run this test unless you have a valid GitHub token in the GITHUB_TOKEN environment variable"]
     async fn test_get_user() {
         env_logger::builder()
             .target(env_logger::Target::Stdout)
@@ -45,5 +45,7 @@ mod tests {
 
         let github_token = env::var("GITHUB_TOKEN").unwrap();
 
+        let account = get_user(&github_token, "aisrael").await.unwrap();
+        assert!(account.id == 89215);
     }
 }
