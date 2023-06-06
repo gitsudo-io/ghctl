@@ -6,7 +6,7 @@ ghctl - A GitHub utility
 
 ghctl is both a command-line utility for GitHub, _and_ a GitHub Action that allows you to use the utility in your GitHub Actions workflows.
 
-> NOTE: ghctl is in early development and is not yet ready for production use. However, please feel free to try it out and provide feedback!
+> NOTE: ghctl is in early development and is not quite ready for production use. However, please feel free to try it out and provide feedback!
 
 
 ## ghctl CLI
@@ -94,7 +94,7 @@ The configuration file should be a YAML file and currently supports the followin
 
 ##### Repository team permissions
 
-```YAML
+```yaml
 teams:
   {team-slug}: {permission}
 ```
@@ -103,7 +103,7 @@ Where `{team-slug}` is the team slug on GitHub, and `{permission}` is one of `pu
 
 **Example:**
 
-```YAML
+```yaml
 teams:
   a-team: maintain
 ```
@@ -113,7 +113,7 @@ When applied to a repository, will grant the `a-team` team `maintain` permission
 
 ##### Repository collaborators
 
-```YAML
+```yaml
 collaborators:
   {username}: {permission}
 ```
@@ -122,32 +122,50 @@ Where `{username}` is the GitHub username, and `{permission}` is one of `pull`, 
 
 **Example:**
 
-```YAML
+```yaml
 collaborators:
   aisrael: admin
 ```
 
-When applied to a repository, will grant the user `aisrael` `admin` permissions to the repository.
+##### Deployment Environments
+
+```yaml
+environments:
+  {environment}:
+    reviewers:
+      - {username}, or
+      - {org}/{team-slug}
+```
+
+Where `{environment}` is the name of the deployment environment, `{username}` is the GitHub username, or, if `{org}/{team-slug}` is given, then it references a GitHub organization and team.
+
+When applied to a repository, will create the deployment environment and configure its reviewers accordingly.
 
 
 ##### Full example
 
-Given a `ghctl.yaml` file containing:
+Given a `gitsudo.yaml` file containing:
 
-```YAML
+```yaml
 teams:
   a-team: maintain
 collaborators:
   aisrael: admin
+environments:
+  gigalixir:
+    reviewers:
+      - aisrael
+      - gitsudo-io/a-team
 ```
 
 When we execute:
 
 ```bash
-$ ghctl repo config apply gitsudo-io/ghctl --access-token ${PERSONAL_ACCESS_TOKEN} -F ghctl.yaml
-[2023-06-01T21:46:06Z INFO ] Added team a-team with permission Maintain to repository gitsudo-io/ghctl
-[2023-06-01T21:46:06Z INFO ] Updated collaborator aisrael with permission admin to repository gitsudo-io/ghctl
-[2023-06-01T21:46:06Z INFO ] Applied configuration to gitsudo-io/ghctl
+$ ghctl repo config apply gitsudo-io/gitsudo --access-token ${GHCTL_ACCESS_TOKEN} -F gitsudo.yaml
+[2023-06-06T01:47:11Z INFO ] Added team a-team with permission Maintain to repository gitsudo-io/gitsudo
+[2023-06-06T01:47:11Z INFO ] Updated collaborator aisrael with permission admin to repository gitsudo-io/gitsudo
+[2023-06-06T01:47:11Z INFO ] Created deployment environment gigalixir in repository gitsudo-io/gitsudo
+[2023-06-06T01:47:11Z INFO ] Applied configuration to gitsudo-io/gitsudo
 ```
 
 
@@ -178,7 +196,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: gitsudo-io/ghctl@main
         with:
-            args: repo config apply gitsudo-io/ghctl --access-token ${{ secrets.GHCTL_ACCESS_TOKEN }} -F ghctl.yaml
+            args: repo config apply gitsudo-io/gitsudo --access-token ${{ secrets.GHCTL_ACCESS_TOKEN }} -F gitsudo.yaml
 ```
 
 Then executing the workflow above will perform the equivalent of the earlier command.
