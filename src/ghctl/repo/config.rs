@@ -169,12 +169,20 @@ impl RepoConfig {
     pub async fn validate_and_prefetch(
         &self,
         access_token: &str,
-        owner: &str
+        owner: &str,
     ) -> Result<(HashMap<String, u64>, HashMap<String, HashMap<String, u64>>)> {
         let mut users = HashMap::new();
 
         if let Some(collaborators) = self.collaborators.as_ref() {
-            for collaborator in collaborators.keys() {
+            for (collaborator, permission) in collaborators {
+                match permission_from_s(permission) {
+                    Some(_) => {}
+                    None => {
+                        let msg = format!("Invalid/unrecognized permission \"{permission}\" for collaborator \"{collaborator}\"!");
+                        return Err(anyhow::anyhow!(msg));
+                    }
+                }
+
                 debug!("Validating user {collaborator}");
                 let user = crate::github::get_user(access_token, collaborator).await?;
                 debug!("Found user {:?}", user);
@@ -193,7 +201,16 @@ impl RepoConfig {
                 .entry(owner.to_string())
                 .or_insert_with(HashMap::new);
 
-            for team_slug in teams.keys() {
+            for (team_slug, permission) in teams {
+                debug!("Validating permission {permission}");
+                match permission_from_s(permission) {
+                    Some(_) => {}
+                    None => {
+                        let msg = format!("Invalid/unrecognized permission \"{permission}\" for team \"{team_slug}\"!");
+                        return Err(anyhow::anyhow!(msg));
+                    }
+                }
+
                 debug!("Validating team {team_slug}");
                 let team = octocrab.teams(owner).get(team_slug).await?;
                 debug!("Found team \"{}\" ({})", team.name, team.id);
@@ -242,18 +259,8 @@ impl RepoConfig {
         owner: &String,
         repo_name: &String,
     ) -> anyhow::Result<()> {
-        let (users, orgs_teams) = self
-            .validate_and_prefetch(access_token, owner)
-            .await?;
+        let (users, orgs_teams) = self.validate_and_prefetch(access_token, owner).await?;
         debug!("Applying configuration");
-        let octocrab = OctocrabBuilder::default()
-            .personal_token(access_token.to_owned())
-            .build()?;
-
-        if let Some(team_permissions) = &self.teams {
-            apply_teams(&octocrab, owner, repo_name, team_permissions).await?;
-        }
-
         let octocrab = OctocrabBuilder::default()
             .personal_token(access_token.to_owned())
             .add_header(
@@ -265,6 +272,11 @@ impl RepoConfig {
                 "2022-11-28".to_string(),
             )
             .build()?;
+
+        if let Some(team_permissions) = &self.teams {
+            apply_teams(&octocrab, owner, repo_name, team_permissions).await?;
+        }
+
         if let Some(collaborator_permissions) = &self.collaborators {
             apply_collaborators(&octocrab, owner, repo_name, collaborator_permissions).await?;
         }
@@ -484,6 +496,35 @@ mod tests {
     use ::http::header::HeaderName;
     use octocrab::OctocrabBuilder;
     use std::env;
+
+    /// We ignore this test for now as it requires an access token for testing and
+    /// performs actual GitHub API calls, until we can add some VCR-like HTTP recording
+    /// in the future.
+    ///
+    /// To run ignored tests locally, use `cargo test -- --ignored`
+    #[tokio::test]
+    async fn test_validate_and_prefetch_invalid_permission() -> Result<(), Box<dyn std::error::Error>> {
+        env_logger::builder()
+            .target(env_logger::Target::Stdout)
+            .init();
+        let github_token = env::var("GITHUB_TOKEN").unwrap();
+
+        let repo_config = serde_yaml::from_str::<super::RepoConfig>(
+            r#"
+            teams:
+                a-team: write
+            "#,
+        )
+        .unwrap();
+        println!("repo_config: {:?}", repo_config);
+
+        if let Err(e) = repo_config.validate_and_prefetch(&github_token, "gitsudo-io").await {
+            assert!(e.to_string().contains("Invalid/unrecognized permission"));
+            Ok(())
+        } else {
+            panic!("Expected error");
+        }
+    }
 
     /// We ignore this test for now as it requires an access token for testing and
     /// performs actual GitHub API calls, until we can add some VCR-like HTTP recording

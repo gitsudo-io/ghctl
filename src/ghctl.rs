@@ -48,7 +48,7 @@ pub async fn cli(opts: Opts) {
         Commands::Version => println!("ghctl version {}", clap::crate_version!()),
         _ => {
             env_logger::builder()
-                .filter_level(opts.verbose.log_level_filter())
+                .filter(Some("ghctl"), opts.verbose.log_level_filter())
                 .format_target(false)
                 .format_timestamp_secs()
                 .target(env_logger::Target::Stdout)
