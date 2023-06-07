@@ -4,7 +4,7 @@ use log::{debug, error, info, warn};
 use octocrab::params::teams::Permission;
 use octocrab::OctocrabBuilder;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs};
+use std::collections::HashMap;
 
 /// A struct that represents the ghctl configuration for a GitHub repository
 #[derive(Debug, Serialize, Deserialize)]
