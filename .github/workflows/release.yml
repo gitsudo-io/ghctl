@@ -35,3 +35,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
           files: |
             ghctl-${{ matrix.target }}.tar.gz
+
+      - name: cargo publish
+        run: |
+          cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
