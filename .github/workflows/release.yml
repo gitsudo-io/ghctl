@@ -36,6 +36,9 @@ jobs:
           files: |
             ghctl-${{ matrix.target }}.tar.gz
 
+  cargo-publish:
+    runs-on: ubuntu-latest
+    steps:          
       - name: cargo publish
         run: |
           cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
