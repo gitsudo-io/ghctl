@@ -12,15 +12,13 @@ jobs:
       matrix:
         target: 
           - aarch64-unknown-linux-gnu
-          - armv7-unknown-linux-gnueabihf
           - i686-unknown-linux-gnu
-          - i686-unknown-linux-musl
-          - arm-unknown-linux-gnueabi          
-          - x86_64-unknown-linux-gnu           
-          - x86_64-unknown-linux-musl
+          - x86_64-unknown-linux-gnu
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: ${{ matrix.target }}
       - run: |
           cargo test
           cargo clippy
