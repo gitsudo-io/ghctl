@@ -507,7 +507,6 @@ mod tests {
         env_logger::builder()
             .target(env_logger::Target::Stdout)
             .init();
-        let github_token = env::var("GITHUB_TOKEN").unwrap();
 
         let repo_config = serde_yaml::from_str::<super::RepoConfig>(
             r#"
@@ -518,7 +517,7 @@ mod tests {
         .unwrap();
         println!("repo_config: {:?}", repo_config);
 
-        if let Err(e) = repo_config.validate_and_prefetch(&github_token, "gitsudo-io").await {
+        if let Err(e) = repo_config.validate_and_prefetch("", "gitsudo-io").await {
             assert!(e.to_string().contains("Invalid/unrecognized permission"));
             Ok(())
         } else {
