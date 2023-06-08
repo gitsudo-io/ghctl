@@ -503,7 +503,8 @@ mod tests {
     ///
     /// To run ignored tests locally, use `cargo test -- --ignored`
     #[tokio::test]
-    async fn test_validate_and_prefetch_invalid_permission() -> Result<(), Box<dyn std::error::Error>> {
+    async fn test_validate_and_prefetch_invalid_permission(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         env_logger::builder()
             .target(env_logger::Target::Stdout)
             .init();

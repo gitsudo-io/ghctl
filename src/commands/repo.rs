@@ -88,9 +88,7 @@ pub async fn repo(context: &ghctl::Context, repo: &RepoCommand) {
             RepoEnvironmentsSubcomand::Get {
                 repo_name,
                 environment_name,
-            } => {
-                ghctl::repo::environments_get(context, repo_name, environment_name).await
-            }
+            } => ghctl::repo::environments_get(context, repo_name, environment_name).await,
         },
 
         RepoSubcommand::Config(command) => {

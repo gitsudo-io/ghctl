@@ -1,6 +1,6 @@
 mod commands;
-mod github;
 mod ghctl;
+mod github;
 mod utils;
 
 use clap::Parser;

@@ -24,15 +24,10 @@ pub async fn get_repo(
 }
 
 pub async fn environments_list(context: &crate::ghctl::Context, repo_name: &String) {
-    do_environments_list(context, repo_name)
-        .await
-        .unwrap();
+    do_environments_list(context, repo_name).await.unwrap();
 }
 
-async fn do_environments_list(
-    context: &crate::ghctl::Context,
-    repo_name: &String,
-) -> Result<()> {
+async fn do_environments_list(context: &crate::ghctl::Context, repo_name: &String) -> Result<()> {
     let (owner, repo) = split_some_repo_full_name(repo_name)?;
 
     let octocrab = OctocrabBuilder::default()
@@ -111,4 +106,3 @@ async fn do_environments_get(
 
     Ok(())
 }
-
