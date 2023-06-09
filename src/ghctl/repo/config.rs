@@ -137,9 +137,9 @@ fn merge_environments(
 
 fn permission_from_s(s: &str) -> Option<Permission> {
     match s {
-        "pull" => Some(Permission::Pull),
+        "pull" | "read" => Some(Permission::Pull),
         "triage" => Some(Permission::Triage),
-        "push" => Some(Permission::Push),
+        "push" | "write" => Some(Permission::Push),
         "maintain" => Some(Permission::Maintain),
         "admin" => Some(Permission::Admin),
         _ => None,
