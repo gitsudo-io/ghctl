@@ -107,8 +107,13 @@ pub async fn config(context: &ghctl::Context, repo_config: &RepoConfigCommand) -
             config_files,
         } => {
             let (owner, repo_name) = split_repo_full_name(repo_full_name).unwrap();
-            match ghctl::repo::config::apply(&context.access_token, owner, repo_name, config_files)
-                .await
+            match ghctl::repo::config::apply(
+                &context.access_token,
+                &owner,
+                &repo_name,
+                config_files,
+            )
+            .await
             {
                 Ok(_) => info!(
                     "Applied configuration to {}",

@@ -6,6 +6,9 @@ use octocrab::OctocrabBuilder;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::github;
+use github::AddRepositoryCollaboratorResult;
+
 /// A struct that represents the ghctl configuration for a GitHub repository
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RepoConfig {
@@ -29,12 +32,10 @@ pub async fn get(_context: &crate::ghctl::Context, repo_full_name: &String) -> R
 /// The `repo config apply` command
 pub async fn apply(
     access_token: &str,
-    owner: impl Into<String>,
-    repo: impl Into<String>,
+    owner: &str,
+    repo: &str,
     config_files: &Vec<String>,
 ) -> Result<()> {
-    let owner = owner.into();
-    let repo = repo.into();
     debug!("Applying configuration to {owner}/{repo}");
 
     if config_files.is_empty() {
@@ -64,7 +65,7 @@ pub async fn apply(
 
     debug!("Applying merged configuration: {:?}", merged_config);
 
-    match merged_config.apply(access_token, &owner, &repo).await {
+    match merged_config.apply(access_token, owner, repo).await {
         Ok(_) => {
             debug!("Applied configuration to {owner}/{repo}");
         }
@@ -276,8 +277,8 @@ impl RepoConfig {
     pub async fn apply(
         &self,
         access_token: &str,
-        owner: &String,
-        repo_name: &String,
+        owner: &str,
+        repo_name: &str,
     ) -> anyhow::Result<()> {
         let (users, orgs_teams) = self.validate_and_prefetch(access_token, owner).await?;
         debug!("Applying configuration");
@@ -294,7 +295,7 @@ impl RepoConfig {
             .build()?;
 
         if let Some(team_permissions) = &self.teams {
-            apply_teams(&octocrab, owner, repo_name, team_permissions).await?;
+            apply_teams(access_token, &octocrab, owner, repo_name, team_permissions).await?;
         }
 
         if let Some(collaborator_permissions) = &self.collaborators {
@@ -310,13 +311,25 @@ impl RepoConfig {
 }
 
 async fn apply_teams(
+    access_token: &str,
     octocrab: &octocrab::Octocrab,
-    owner: &String,
-    repo: &String,
+    owner: &str,
+    repo: &str,
     team_permissions: &HashMap<String, String>,
 ) -> anyhow::Result<()> {
     debug!("Applying teams");
     for (team_slug, permission_s) in team_permissions {
+        let result =
+            github::check_team_permissions(access_token, owner, team_slug, owner, repo).await?;
+        let already_has_permission = match result.permissions.get(permission_s) {
+            Some(v) => *v,
+            None => false,
+        };
+        if already_has_permission {
+            info!("Team {team_slug} already has permission {permission_s} on {owner}/{repo}");
+            continue;
+        }
+
         let permission = permission_from_s(permission_s).unwrap();
 
         match octocrab
@@ -345,47 +358,50 @@ async fn apply_teams(
 
 async fn apply_collaborators(
     octocrab: &octocrab::Octocrab,
-    owner: &String,
-    repo: &String,
+    owner: &str,
+    repo: &str,
     collaborator_permissions: &HashMap<String, String>,
 ) -> anyhow::Result<()> {
     debug!("Applying collaborators");
 
     for (username, permission_s) in collaborator_permissions {
-        let permission = permission_from_s(permission_s).unwrap();
-        let value = permission_to_s(&permission);
-        let route = format!("/repos/{owner}/{repo}/collaborators/{username}");
+        if github::check_if_user_is_repository_collaborator(octocrab, owner, repo, username).await?
+        {
+            let result =
+                github::get_repository_permissions_for_user(octocrab, owner, repo, username)
+                    .await?;
 
-        let body = serde_json::json!({ "permission": value });
+            if result.permission == *permission_s {
+                info!("User {username} already has permission {permission_s} on repository {owner}/{repo}");
+                continue;
+            }
+        }
 
-        let result = octocrab._put(route, Some(&body)).await;
-
-        match result {
-            Ok(resp) => match resp.status() {
-                StatusCode::OK | StatusCode::CREATED => {
+        match permission_from_s(permission_s) {
+            Some(permission) => match github::add_repository_collaborator(
+                octocrab,
+                owner,
+                repo,
+                username,
+                permission_to_s(&permission),
+            )
+            .await?
+            {
+                AddRepositoryCollaboratorResult::Ok(body) => {
                     info!(
-                            "Added collaborator {username} with permission {value} to repository {owner}/{repo}"
+                            "Added collaborator {username} with permission {permission_s} to repository {owner}/{repo}"
                         );
-                    let body = hyper::body::to_bytes(resp.into_body()).await?;
-                    println!("{}", String::from_utf8(body.to_vec())?);
+                    println!("{}", body);
                 }
-                StatusCode::NO_CONTENT => {
+                AddRepositoryCollaboratorResult::AlreadyExists => {
                     info!(
-                            "Updated collaborator {username} with permission {value} to repository {owner}/{repo}"
+                            "Updated collaborator {username} with permission {permission_s} to repository {owner}/{repo}"
                         );
-                }
-                _ => {
-                    error!(
-                            "Error updating collaborator {username} with permission {value} to repository {owner}/{repo}: {}", resp.status()
-                        );
-                    return Err(anyhow::anyhow!(resp.status()));
                 }
             },
-            Err(e) => {
-                error!(
-                    "Error adding collaborator {username} with permission {value} to repository {owner}/{repo}: {e}"
-                );
-                return Err(e.into());
+            None => {
+                let msg = format!("Invalid/unrecognized permission \"{permission_s}\" for collaborator \"{username}\"!");
+                return Err(anyhow::anyhow!(msg));
             }
         }
     }
@@ -426,8 +442,8 @@ impl CreateOrUpdateEnvironmentRequest {
 
 async fn apply_environments(
     octocrab: &octocrab::Octocrab,
-    owner: &String,
-    repo: &String,
+    owner: &str,
+    repo: &str,
     environments: &HashMap<String, RepoEnvironment>,
     users: HashMap<String, u64>,
     orgs_teams: HashMap<String, HashMap<String, u64>>,
