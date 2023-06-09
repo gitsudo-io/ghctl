@@ -532,7 +532,7 @@ mod tests {
         let repo_config = serde_yaml::from_str::<super::RepoConfig>(
             r#"
             teams:
-                a-team: write
+                a-team: foo
             "#,
         )
         .unwrap();
