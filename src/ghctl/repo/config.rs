@@ -104,18 +104,18 @@ where
 }
 
 fn merge_environments(
-    first: Option<HashMap<String, RepoEnvironment>>,
-    second: Option<HashMap<String, RepoEnvironment>>,
+    maybe_first: Option<HashMap<String, RepoEnvironment>>,
+    maybe_second: Option<HashMap<String, RepoEnvironment>>,
 ) -> Option<HashMap<String, RepoEnvironment>> {
-    if let Some(map1) = first {
-        if let Some(mut map2) = second {
-            for (environment_name, repo_environment) in map1 {
-                if let Some(repo_environment2) = map2.get(&environment_name) {
+    if let Some(first) = maybe_first {
+        if let Some(mut second) = maybe_second {
+            for (environment_name, repo_environment) in first {
+                if let Some(repo_environment2) = second.get(&environment_name) {
                     if let Some(reviewers) = &repo_environment.reviewers {
                         if let Some(reviewers2) = &repo_environment2.reviewers {
                             let reviewers =
                                 reviewers.iter().chain(reviewers2.iter()).cloned().collect();
-                            map2.insert(
+                            second.insert(
                                 environment_name,
                                 RepoEnvironment {
                                     reviewers: Some(reviewers),
@@ -126,12 +126,12 @@ fn merge_environments(
                 }
             }
 
-            Some(map2)
+            Some(second)
         } else {
-            Some(map1)
+            Some(first)
         }
     } else {
-        second
+        maybe_second
     }
 }
 
@@ -220,37 +220,57 @@ impl RepoConfig {
 
         if let Some(environments) = self.environments.as_ref() {
             for repo_environment in environments.values() {
-                if let Some(reviewers) = &repo_environment.reviewers {
-                    for reviewer in reviewers {
-                        match reviewer.split_once('/') {
-                            Some((org, team_slug)) => {
-                                if org.is_empty() || team_slug.is_empty() {
-                                    warn!("Invalid {{org}}/{{team}} name: \"{}\"!", reviewer);
-                                } else {
-                                    let teams = orgs_teams
-                                        .entry(org.to_string())
-                                        .or_insert_with(HashMap::new);
-                                    if !teams.contains_key(team_slug) {
-                                        debug!("Validating team {team_slug}");
-                                        let team = octocrab.teams(org).get(team_slug).await?;
-                                        debug!("Found team \"{}\" ({})", team.name, team.id);
-                                        teams.insert(team_slug.to_string(), *team.id);
-                                    }
-                                }
-                            }
+                self.validate_repo_environment(
+                    &octocrab,
+                    &mut users,
+                    &mut orgs_teams,
+                    access_token,
+                    repo_environment,
+                )
+                .await?;
+            }
+        }
 
-                            None => {
-                                let user = crate::github::get_user(access_token, reviewer).await?;
-                                debug!("Found user {:?}", user);
-                                users.insert(reviewer.clone(), user.id);
+        Ok((users, orgs_teams))
+    }
+
+    async fn validate_repo_environment(
+        &self,
+        octocrab: &octocrab::Octocrab,
+        users: &mut HashMap<String, u64>,
+        orgs_teams: &mut HashMap<String, HashMap<String, u64>>,
+        access_token: &str,
+        repo_environment: &RepoEnvironment,
+    ) -> Result<()> {
+        if let Some(reviewers) = &repo_environment.reviewers {
+            for reviewer in reviewers {
+                match reviewer.split_once('/') {
+                    Some((org, team_slug)) => {
+                        if org.is_empty() || team_slug.is_empty() {
+                            warn!("Invalid {{org}}/{{team}} name: \"{}\"!", reviewer);
+                        } else {
+                            let teams = orgs_teams
+                                .entry(org.to_string())
+                                .or_insert_with(HashMap::new);
+                            if !teams.contains_key(team_slug) {
+                                debug!("Validating team {team_slug}");
+                                let team = octocrab.teams(org).get(team_slug).await?;
+                                debug!("Found team \"{}\" ({})", team.name, team.id);
+                                teams.insert(team_slug.to_string(), *team.id);
                             }
                         }
+                    }
+
+                    None => {
+                        let user = crate::github::get_user(access_token, reviewer).await?;
+                        debug!("Found user {:?}", user);
+                        users.insert(reviewer.clone(), user.id);
                     }
                 }
             }
         }
 
-        Ok((users, orgs_teams))
+        Ok(())
     }
 
     pub async fn apply(
