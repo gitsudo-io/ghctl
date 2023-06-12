@@ -533,6 +533,13 @@ mod tests {
     use octocrab::OctocrabBuilder;
     use std::env;
 
+    fn init() {
+        env_logger::builder()
+            .target(env_logger::Target::Stdout)
+            .try_init()
+            .unwrap_or_default();
+    }
+
     /// We ignore this test for now as it requires an access token for testing and
     /// performs actual GitHub API calls, until we can add some VCR-like HTTP recording
     /// in the future.
@@ -541,9 +548,7 @@ mod tests {
     #[tokio::test]
     async fn test_validate_and_prefetch_invalid_permission(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        env_logger::builder()
-            .target(env_logger::Target::Stdout)
-            .init();
+        init();
 
         let repo_config = serde_yaml::from_str::<super::RepoConfig>(
             r#"
@@ -570,9 +575,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_validate_and_prefetch() -> Result<(), Box<dyn std::error::Error>> {
-        env_logger::builder()
-            .target(env_logger::Target::Stdout)
-            .init();
+        init();
         let github_token = env::var("GITHUB_TOKEN").unwrap();
 
         let repo_config = serde_yaml::from_str::<super::RepoConfig>(
@@ -614,9 +617,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_repo_config() -> Result<(), Box<dyn std::error::Error>> {
-        env_logger::builder()
-            .target(env_logger::Target::Stdout)
-            .init();
+        init();
 
         let github_token = env::var("GITHUB_TOKEN").unwrap();
 

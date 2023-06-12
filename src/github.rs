@@ -161,7 +161,7 @@ mod tests {
     fn init() {
         env_logger::builder()
             .target(env_logger::Target::Stdout)
-            .init();
+            .try_init().unwrap_or_default();
     }
 
     #[tokio::test]
