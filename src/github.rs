@@ -167,7 +167,7 @@ pub struct RepositoryBranchProtection {
 pub struct RequiredStatusChecks {
     pub strict: bool,
     pub contexts: Vec<String>,
-    pub enforcement_level: String,
+    pub enforcement_level: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -315,9 +315,15 @@ mod tests {
         let e = before.unwrap_err();
         assert!(e.to_string().starts_with("GitHub: Branch not protected\n"));
 
+        let required_status_checks = RequiredStatusChecks {
+            strict: true,
+            contexts: vec!["mix-test".to_owned()],
+            enforcement_level: None,
+        };
+
         let repository_branch_protection = RepositoryBranchProtection {
             name: Some(branch.to_owned()),
-            required_status_checks: None,
+            required_status_checks: Some(required_status_checks),
             enforce_admins: None,
             required_pull_request_reviews: None,
             restrictions: None,
