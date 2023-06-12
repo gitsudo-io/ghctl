@@ -5,7 +5,10 @@ use std::collections::HashMap;
 use anyhow::Result;
 use http::{HeaderName, StatusCode};
 use log::error;
-use octocrab::{Octocrab, OctocrabBuilder, models::{App, teams::Team, UserId}};
+use octocrab::{
+    models::{teams::Team, App, UserId},
+    Octocrab, OctocrabBuilder,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -30,7 +33,7 @@ pub async fn get_user(access_token: &str, username: &str) -> Result<Account> {
     match result {
         Ok(account) => Ok(account),
         Err(e) => {
-            error!("Error: {}", e);
+            error!("{}", e);
             Err(anyhow::anyhow!(e))
         }
     }
@@ -38,7 +41,7 @@ pub async fn get_user(access_token: &str, username: &str) -> Result<Account> {
 
 /// A struct that can be used to partially deserialize the response from the check_team_permissions() GitHub
 /// API call.
-/// 
+///
 /// See: https://docs.github.com/en/rest/teams/teams?apiVersion=2022-11-28#check-team-permissions-for-a-repository
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TeamRepositoryPermission {
@@ -49,7 +52,7 @@ pub struct TeamRepositoryPermission {
 }
 
 /// Check a team permission for a GitHub repository
-/// 
+///
 /// See: https://docs.github.com/en/rest/teams/teams?apiVersion=2022-11-28#check-team-permissions-for-a-repository
 pub async fn check_team_permissions(
     access_token: &str,
@@ -82,7 +85,7 @@ pub async fn check_team_permissions(
 
 /// A struct that can be used to partially deserialize the response from the get_repository_permissions_for_user()
 /// GitHub API call.
-/// 
+///
 /// See: https://docs.github.com/en/rest/collaborators/collaborators?apiVersion=2022-11-28#get-repository-permissions-for-a-user
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UserRepositoryPermission {
@@ -110,7 +113,7 @@ pub async fn get_repository_permissions_for_user(
 }
 
 /// A simple enum to hold the results of the add_repository_collaborator() call. Can either be:
-/// 
+///
 /// * Ok(String) - The username was added to the repository, and the String is the JSON response from GitHub
 /// * AlreadyExists - The username was already a collaborator on the repository, and we received an empty response body
 ///
@@ -151,10 +154,13 @@ pub async fn add_repository_collaborator(
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RepositoryBranchProtection {
+    pub name: Option<String>,
     pub required_status_checks: Option<RequiredStatusChecks>,
     pub enforce_admins: Option<EnforceAdmins>,
     pub required_pull_request_reviews: Option<RequiredPullRequestReviews>,
     pub restrictions: Option<Restrictions>,
+    pub required_linear_history: Option<RequiredLinearHistory>,
+    pub required_signatures: Option<RequiredSignatures>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -181,6 +187,59 @@ pub struct Restrictions {
     pub users: Vec<Account>,
     pub teams: Vec<Team>,
     pub apps: Vec<App>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RequiredLinearHistory {
+    pub enabled: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RequiredSignatures {
+    pub enabled: bool,
+    pub url: String,
+}
+
+/// Get branch protection
+///
+/// See: https://docs.github.com/en/rest/branches/branch-protection?apiVersion=2022-11-28#get-branch-protection
+pub async fn get_branch_protection(
+    octocrab: &Octocrab,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+) -> Result<RepositoryBranchProtection> {
+    let route = format!("/repos/{owner}/{repo}/branches/{branch}/protection");
+    match octocrab.get(route, NO_PARAMETERS).await {
+        Ok(repository_branch_protection) => Ok(repository_branch_protection),
+        Err(e) => {
+            error!("Error: {}", e);
+            Err(anyhow::anyhow!(e))
+        }
+    }
+}
+
+/// Update branch protection
+///
+/// See: https://docs.github.com/en/rest/branches/branch-protection?apiVersion=2022-11-28#update-branch-protection
+pub async fn update_branch_protection(
+    octocrab: &Octocrab,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+    repository_branch_protection: &RepositoryBranchProtection,
+) -> Result<RepositoryBranchProtection> {
+    let route = format!("/repos/{owner}/{repo}/branches/{branch}/protection");
+    match octocrab
+        .put(route, Some(repository_branch_protection))
+        .await
+    {
+        Ok(repository_branch_protection) => Ok(repository_branch_protection),
+        Err(e) => {
+            error!("Error: {}", e);
+            Err(anyhow::anyhow!(e))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -234,5 +293,48 @@ mod tests {
                     ("pull".to_string(), true)
                 ])
         );
+    }
+
+    #[tokio::test]
+    #[ignore = "Don't run this test unless you have a valid GitHub token in the GITHUB_TOKEN environment variable"]
+    async fn test_github_get_branch_protection() {
+        init();
+
+        let github_token = env::var("GITHUB_TOKEN").unwrap();
+        let octocrab = OctocrabBuilder::default()
+            .personal_token(github_token)
+            .build()
+            .unwrap();
+
+        let owner = "gitsudo-io";
+        let repo = "gitsudo";
+        let branch = "main";
+
+        let before = get_branch_protection(&octocrab, owner, repo, branch).await;
+        assert!(before.is_err());
+        let e = before.unwrap_err();
+        assert!(e.to_string().starts_with("GitHub: Branch not protected\n"));
+
+        let repository_branch_protection = RepositoryBranchProtection {
+            name: Some(branch.to_owned()),
+            required_status_checks: None,
+            enforce_admins: None,
+            required_pull_request_reviews: None,
+            restrictions: None,
+            required_linear_history: None,
+            required_signatures: None,
+        };
+
+        let result = update_branch_protection(
+            &octocrab,
+            &owner,
+            &repo,
+            &branch,
+            &repository_branch_protection,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        println!("{:?}", result);
     }
 }

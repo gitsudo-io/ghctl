@@ -2,8 +2,8 @@ use anyhow::Result;
 use http::{HeaderName, StatusCode};
 use log::{debug, error, info, warn};
 use octocrab::models::TeamId;
-use octocrab::{params::teams::Permission, models::UserId};
 use octocrab::OctocrabBuilder;
+use octocrab::{models::UserId, params::teams::Permission};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -172,7 +172,10 @@ impl RepoConfig {
         &self,
         access_token: &str,
         owner: &str,
-    ) -> Result<(HashMap<String, UserId>, HashMap<String, HashMap<String, TeamId>>)> {
+    ) -> Result<(
+        HashMap<String, UserId>,
+        HashMap<String, HashMap<String, TeamId>>,
+    )> {
         let mut users = HashMap::new();
 
         if let Some(collaborators) = self.collaborators.as_ref() {
