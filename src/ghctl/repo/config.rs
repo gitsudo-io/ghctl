@@ -1,7 +1,8 @@
 use anyhow::Result;
 use http::{HeaderName, StatusCode};
 use log::{debug, error, info, warn};
-use octocrab::params::teams::Permission;
+use octocrab::models::TeamId;
+use octocrab::{params::teams::Permission, models::UserId};
 use octocrab::OctocrabBuilder;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -171,7 +172,7 @@ impl RepoConfig {
         &self,
         access_token: &str,
         owner: &str,
-    ) -> Result<(HashMap<String, u64>, HashMap<String, HashMap<String, u64>>)> {
+    ) -> Result<(HashMap<String, UserId>, HashMap<String, HashMap<String, TeamId>>)> {
         let mut users = HashMap::new();
 
         if let Some(collaborators) = self.collaborators.as_ref() {
@@ -191,7 +192,7 @@ impl RepoConfig {
             }
         }
 
-        let mut orgs_teams: HashMap<String, HashMap<String, u64>> = HashMap::new();
+        let mut orgs_teams: HashMap<String, HashMap<String, TeamId>> = HashMap::new();
 
         let octocrab = OctocrabBuilder::default()
             .personal_token(access_token.to_owned())
@@ -215,7 +216,7 @@ impl RepoConfig {
                 debug!("Validating team {team_slug}");
                 let team = octocrab.teams(owner).get(team_slug).await?;
                 debug!("Found team \"{}\" ({})", team.name, team.id);
-                org.insert(team_slug.clone(), *team.id);
+                org.insert(team_slug.clone(), team.id);
             }
         }
 
@@ -238,8 +239,8 @@ impl RepoConfig {
     async fn validate_repo_environment(
         &self,
         octocrab: &octocrab::Octocrab,
-        users: &mut HashMap<String, u64>,
-        orgs_teams: &mut HashMap<String, HashMap<String, u64>>,
+        users: &mut HashMap<String, UserId>,
+        orgs_teams: &mut HashMap<String, HashMap<String, TeamId>>,
         access_token: &str,
         repo_environment: &RepoEnvironment,
     ) -> Result<()> {
@@ -257,7 +258,7 @@ impl RepoConfig {
                                 debug!("Validating team {team_slug}");
                                 let team = octocrab.teams(org).get(team_slug).await?;
                                 debug!("Found team \"{}\" ({})", team.name, team.id);
-                                teams.insert(team_slug.to_string(), *team.id);
+                                teams.insert(team_slug.to_string(), team.id);
                             }
                         }
                     }
@@ -365,7 +366,10 @@ async fn apply_collaborators(
     debug!("Applying collaborators");
 
     for (username, permission_s) in collaborator_permissions {
-        if github::check_if_user_is_repository_collaborator(octocrab, owner, repo, username).await?
+        if octocrab
+            .repos(owner, repo)
+            .is_collaborator(username)
+            .await?
         {
             let result =
                 github::get_repository_permissions_for_user(octocrab, owner, repo, username)
@@ -445,8 +449,8 @@ async fn apply_environments(
     owner: &str,
     repo: &str,
     environments: &HashMap<String, RepoEnvironment>,
-    users: HashMap<String, u64>,
-    orgs_teams: HashMap<String, HashMap<String, u64>>,
+    users: HashMap<String, UserId>,
+    orgs_teams: HashMap<String, HashMap<String, TeamId>>,
 ) -> anyhow::Result<()> {
     debug!("Applying environments");
 
@@ -464,7 +468,7 @@ async fn apply_environments(
                         } else {
                             let teams = orgs_teams.get(org).unwrap();
                             match teams.get(team_slug) {
-                                Some(id) => request_data.add_reviewer("Team", *id),
+                                Some(id) => request_data.add_reviewer("Team", id.into_inner()),
                                 None => {
                                     warn!(
                                         "Unknown team \"{}\" in organization \"{}\"",
@@ -476,7 +480,7 @@ async fn apply_environments(
                     }
 
                     None => match users.get(reviewer) {
-                        Some(id) => request_data.add_reviewer("User", *id),
+                        Some(id) => request_data.add_reviewer("User", id.into_inner()),
                         None => warn!("Unknown user \"{}\"", reviewer),
                     },
                 }
@@ -598,13 +602,13 @@ mod tests {
             .validate_and_prefetch(&github_token, "gitsudo-io")
             .await?;
         assert!(!users.is_empty());
-        assert!(*users.get("aisrael").unwrap() == 89215);
+        assert!(*users.get("aisrael").unwrap() == UserId::from(89215));
 
         assert!(!teams.is_empty());
         let gitsudo_io = teams.get("gitsudo-io").unwrap();
         assert!(!gitsudo_io.is_empty());
-        assert!(*gitsudo_io.get("a-team").unwrap() == 7604587);
-        assert!(*gitsudo_io.get("infrastructure").unwrap() == 7924849);
+        assert!(gitsudo_io.get("a-team").unwrap().into_inner() == 7604587);
+        assert!(gitsudo_io.get("infrastructure").unwrap().into_inner() == 7924849);
 
         Ok(())
     }

@@ -5,12 +5,12 @@ use std::collections::HashMap;
 use anyhow::Result;
 use http::{HeaderName, StatusCode};
 use log::error;
-use octocrab::{Octocrab, OctocrabBuilder};
+use octocrab::{Octocrab, OctocrabBuilder, models::{App, teams::Team, UserId}};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Account {
-    pub id: u64,
+    pub id: UserId,
     pub login: String,
     pub r#type: String,
 }
@@ -36,6 +36,10 @@ pub async fn get_user(access_token: &str, username: &str) -> Result<Account> {
     }
 }
 
+/// A struct that can be used to partially deserialize the response from the check_team_permissions() GitHub
+/// API call.
+/// 
+/// See: https://docs.github.com/en/rest/teams/teams?apiVersion=2022-11-28#check-team-permissions-for-a-repository
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TeamRepositoryPermission {
     pub name: String,
@@ -45,6 +49,8 @@ pub struct TeamRepositoryPermission {
 }
 
 /// Check a team permission for a GitHub repository
+/// 
+/// See: https://docs.github.com/en/rest/teams/teams?apiVersion=2022-11-28#check-team-permissions-for-a-repository
 pub async fn check_team_permissions(
     access_token: &str,
     org: &str,
@@ -74,25 +80,10 @@ pub async fn check_team_permissions(
     }
 }
 
-/// Check if a user is a repository collaborator.
-///
-/// See: https://docs.github.com/en/rest/collaborators/collaborators?apiVersion=2022-11-28#check-if-a-user-is-a-repository-collaborator
-pub async fn check_if_user_is_repository_collaborator(
-    octocrab: &Octocrab,
-    owner: &str,
-    repo: &str,
-    username: &str,
-) -> Result<bool> {
-    let route = format!("/repos/{owner}/{repo}/collaborators/{username}");
-    match octocrab._get(route).await {
-        Ok(resp) => Ok(resp.status() == StatusCode::NO_CONTENT),
-        Err(e) => {
-            error!("Error: {}", e);
-            Err(anyhow::anyhow!(e))
-        }
-    }
-}
-
+/// A struct that can be used to partially deserialize the response from the get_repository_permissions_for_user()
+/// GitHub API call.
+/// 
+/// See: https://docs.github.com/en/rest/collaborators/collaborators?apiVersion=2022-11-28#get-repository-permissions-for-a-user
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UserRepositoryPermission {
     pub permission: String,
@@ -118,6 +109,13 @@ pub async fn get_repository_permissions_for_user(
     }
 }
 
+/// A simple enum to hold the results of the add_repository_collaborator() call. Can either be:
+/// 
+/// * Ok(String) - The username was added to the repository, and the String is the JSON response from GitHub
+/// * AlreadyExists - The username was already a collaborator on the repository, and we received an empty response body
+///
+/// See: https://docs.github.com/en/rest/collaborators/collaborators?apiVersion=2022-11-28#add-a-repository-collaborator
+#[derive(Debug)]
 pub enum AddRepositoryCollaboratorResult {
     Ok(String),
     AlreadyExists,
@@ -147,10 +145,42 @@ pub async fn add_repository_collaborator(
             )?))
         }
         StatusCode::NO_CONTENT => Ok(AddRepositoryCollaboratorResult::AlreadyExists),
-        _ => {
-            Err(anyhow::anyhow!(resp.status()))
-        }
+        _ => Err(anyhow::anyhow!(resp.status())),
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RepositoryBranchProtection {
+    pub required_status_checks: Option<RequiredStatusChecks>,
+    pub enforce_admins: Option<EnforceAdmins>,
+    pub required_pull_request_reviews: Option<RequiredPullRequestReviews>,
+    pub restrictions: Option<Restrictions>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RequiredStatusChecks {
+    pub strict: bool,
+    pub contexts: Vec<String>,
+    pub enforcement_level: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EnforceAdmins {
+    pub enabled: bool,
+    pub url: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RequiredPullRequestReviews {
+    pub dismiss_stale_reviews: bool,
+    pub require_code_owner_reviews: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Restrictions {
+    pub users: Vec<Account>,
+    pub teams: Vec<Team>,
+    pub apps: Vec<App>,
 }
 
 #[cfg(test)]
@@ -161,7 +191,8 @@ mod tests {
     fn init() {
         env_logger::builder()
             .target(env_logger::Target::Stdout)
-            .try_init().unwrap_or_default();
+            .try_init()
+            .unwrap_or_default();
     }
 
     #[tokio::test]
@@ -172,7 +203,7 @@ mod tests {
         let github_token = env::var("GITHUB_TOKEN").unwrap();
 
         let account = get_user(&github_token, "aisrael").await.unwrap();
-        assert!(account.id == 89215);
+        assert!(account.id == UserId::from(89215));
     }
 
     #[tokio::test]
