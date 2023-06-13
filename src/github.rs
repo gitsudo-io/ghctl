@@ -163,12 +163,28 @@ pub struct RepositoryBranchProtection {
     pub required_signatures: Option<RequiredSignatures>,
 }
 
-impl RepositoryBranchProtection {
-    pub fn new() -> RepositoryBranchProtection {
-        RepositoryBranchProtection {
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RepositoryBranchProtectionRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub required_status_checks: Option<RequiredStatusChecks>,
+    pub enforce_admins: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub required_pull_request_reviews: Option<RequiredPullRequestReviews>,
+    pub restrictions: Option<Restrictions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub required_linear_history: Option<RequiredLinearHistory>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub required_signatures: Option<RequiredSignatures>,
+}
+
+impl RepositoryBranchProtectionRequest {
+    pub fn new() -> RepositoryBranchProtectionRequest {
+        RepositoryBranchProtectionRequest {
             name: None,
             required_status_checks: None,
-            enforce_admins: None,
+            enforce_admins: false,
             required_pull_request_reviews: None,
             restrictions: None,
             required_linear_history: None,
@@ -181,6 +197,7 @@ impl RepositoryBranchProtection {
 pub struct RequiredStatusChecks {
     pub strict: bool,
     pub contexts: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub enforcement_level: Option<String>,
 }
 
@@ -243,18 +260,15 @@ pub async fn update_branch_protection(
     owner: &str,
     repo: &str,
     branch: &str,
-    repository_branch_protection: &RepositoryBranchProtection,
+    repository_branch_protection_request: &RepositoryBranchProtectionRequest,
 ) -> Result<RepositoryBranchProtection> {
     let route = format!("/repos/{owner}/{repo}/branches/{branch}/protection");
     match octocrab
-        .put(route, Some(repository_branch_protection))
+        .put(route, Some(repository_branch_protection_request))
         .await
     {
         Ok(repository_branch_protection) => Ok(repository_branch_protection),
-        Err(e) => {
-            error!("Error: {}", e);
-            Err(anyhow::anyhow!(e))
-        }
+        Err(e) => Err(anyhow::anyhow!(e)),
     }
 }
 
@@ -339,10 +353,10 @@ mod tests {
             enforcement_level: None,
         };
 
-        let repository_branch_protection = RepositoryBranchProtection {
+        let repository_branch_protection_request = RepositoryBranchProtectionRequest {
             name: Some(branch.to_owned()),
             required_status_checks: Some(required_status_checks),
-            enforce_admins: None,
+            enforce_admins: false,
             required_pull_request_reviews: None,
             restrictions: None,
             required_linear_history: None,
@@ -354,7 +368,7 @@ mod tests {
             &owner,
             &repo,
             &branch,
-            &repository_branch_protection,
+            &repository_branch_protection_request,
         )
         .await;
 

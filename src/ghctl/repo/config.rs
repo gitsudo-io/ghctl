@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::github;
+use crate::utils::split_some_repo_full_name;
 use github::AddRepositoryCollaboratorResult;
 
 /// A struct that represents the ghctl configuration for a GitHub repository
@@ -27,7 +28,7 @@ pub struct RepoEnvironment {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BranchProtectionRule {
     pub require_pull_request: Option<RequirePullRequest>,
-    pub required_status_checks: Option<Vec<String>>,
+    pub required_status_checks: Option<RequiredStatusChecks>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -42,9 +43,36 @@ pub struct RequirePullRequestSettings {
     pub required_approving_review_count: Option<u8>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RequiredStatusChecks {
+    pub strict: Option<bool>,
+    pub contexts: Option<Vec<String>>,
+}
+
 /// The `repo config get` command
-pub async fn get(_context: &crate::ghctl::Context, repo_full_name: &String) -> Result<()> {
-    error!("Not yet implemented: repo config get {}", repo_full_name);
+pub async fn get(context: &crate::ghctl::Context, repo_full_name: &String) -> Result<()> {
+    let (owner, repo) = split_some_repo_full_name(repo_full_name)?;
+
+    let octocrab = OctocrabBuilder::default()
+        .personal_token(context.access_token.to_owned())
+        .add_header(
+            HeaderName::from_static("accept"),
+            "application/vnd.github.v3.repository+json".to_string(),
+        )
+        .add_header(
+            HeaderName::from_static("x-github-api-version"),
+            "2022-11-28".to_string(),
+        )
+        .build()?;
+
+    match octocrab.repos(owner, repo).get().await {
+        Ok(repo) => {
+            println!("{}", serde_json::to_string_pretty(&repo).unwrap());
+        }
+        Err(e) => {
+            error!("Error: {}", e);
+        }
+    }
 
     Ok(())
 }
@@ -577,7 +605,7 @@ async fn apply_branch_protection_rule(
     branch: &str,
     branch_protection_rule: &BranchProtectionRule,
 ) -> Result<()> {
-    let mut repository_branch_protection = github::RepositoryBranchProtection::new();
+    let mut repository_branch_protection = github::RepositoryBranchProtectionRequest::new();
 
     if let Some(require_pull_request) = &branch_protection_rule.require_pull_request {
         repository_branch_protection.required_pull_request_reviews = match require_pull_request {
@@ -604,8 +632,11 @@ async fn apply_branch_protection_rule(
 
     if let Some(required_status_checks) = &branch_protection_rule.required_status_checks {
         repository_branch_protection.required_status_checks = Some(github::RequiredStatusChecks {
-            strict: false,
-            contexts: required_status_checks.clone(),
+            strict: required_status_checks.strict.unwrap_or(false),
+            contexts: match required_status_checks.contexts.as_ref() {
+                Some(contexts) => contexts.clone(),
+                None => Vec::new(),
+            },
             enforcement_level: None,
         });
     }
@@ -617,8 +648,18 @@ async fn apply_branch_protection_rule(
         branch,
         &repository_branch_protection,
     )
-    .await?;
-    println!("{:?}", result);
+    .await;
+
+    match result {
+        Ok(repository_branch_protection) => debug!("{:?}", repository_branch_protection),
+        Err(e) => {
+            debug!(
+                "{}",
+                serde_json::to_string_pretty(&repository_branch_protection)?
+            );
+            error!("{:?}", e);
+        }
+    }
 
     Ok(())
 }
@@ -736,6 +777,9 @@ mod tests {
                         - gitsudo-io/a-team
             branch_protection_rules:
                 main:
+                    required_status_checks:
+                        contexts:
+                            - "mix/test"
                     require_pull_request:
                         required_approving_review_count: 1
             "#,
