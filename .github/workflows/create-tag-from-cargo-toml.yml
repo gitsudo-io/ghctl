@@ -1,0 +1,17 @@
+name: Create tag from Cargo.toml
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - Cargo.toml
+      - .github/workflows/create-tag-from-cargo-toml.yml
+  workflow_dispatch:
+
+jobs:
+  create-tag-from-cargo-toml:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Create tag from Cargo.toml
+        uses: aisrael/create-tag-from-cargo-toml@main
