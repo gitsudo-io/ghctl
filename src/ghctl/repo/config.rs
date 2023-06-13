@@ -2,8 +2,8 @@ use anyhow::Result;
 use http::{HeaderName, StatusCode};
 use log::{debug, error, info, warn};
 use octocrab::models::TeamId;
-use octocrab::OctocrabBuilder;
 use octocrab::{models::UserId, params::teams::Permission};
+use octocrab::{Octocrab, OctocrabBuilder};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -16,11 +16,30 @@ pub struct RepoConfig {
     pub teams: Option<HashMap<String, String>>,
     pub collaborators: Option<HashMap<String, String>>,
     pub environments: Option<HashMap<String, RepoEnvironment>>,
+    pub branch_protection_rules: Option<HashMap<String, BranchProtectionRule>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RepoEnvironment {
     pub reviewers: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BranchProtectionRule {
+    pub require_pull_request: Option<RequirePullRequest>,
+    pub required_status_checks: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum RequirePullRequest {
+    Enabled(bool),
+    EnabledWithSettings(RequirePullRequestSettings),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RequirePullRequestSettings {
+    pub required_approving_review_count: Option<u8>,
 }
 
 /// The `repo config get` command
@@ -84,6 +103,10 @@ fn merge_config(first: RepoConfig, second: RepoConfig) -> RepoConfig {
         teams: merge_option_hashmap(first.teams, second.teams),
         collaborators: merge_option_hashmap(first.collaborators, second.collaborators),
         environments: merge_environments(first.environments, second.environments),
+        branch_protection_rules: merge_option_hashmap(
+            first.branch_protection_rules,
+            second.branch_protection_rules,
+        ),
     }
 }
 
@@ -165,6 +188,7 @@ impl RepoConfig {
             teams: None,
             collaborators: None,
             environments: None,
+            branch_protection_rules: None,
         }
     }
 
@@ -308,6 +332,11 @@ impl RepoConfig {
 
         if let Some(environments) = &self.environments {
             apply_environments(&octocrab, owner, repo_name, environments, users, orgs_teams)
+                .await?;
+        }
+
+        if let Some(branch_protection_rules) = &self.branch_protection_rules {
+            apply_branch_protection_rules(&octocrab, owner, repo_name, branch_protection_rules)
                 .await?;
         }
         Ok(())
@@ -528,6 +557,66 @@ async fn apply_environments(
     Ok(())
 }
 
+async fn apply_branch_protection_rules(
+    octocrab: &Octocrab,
+    owner: &str,
+    repo: &str,
+    branch_protection_rules: &HashMap<String, BranchProtectionRule>,
+) -> Result<()> {
+    for (branch, branch_protection_rule) in branch_protection_rules {
+        apply_branch_protection_rule(octocrab, owner, repo, &branch, branch_protection_rule).await?
+    }
+
+    Ok(())
+}
+
+async fn apply_branch_protection_rule(
+    octocrab: &Octocrab,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+    branch_protection_rule: &BranchProtectionRule,
+) -> Result<()> {
+
+    let mut repository_branch_protection = github::RepositoryBranchProtection::new();
+
+    if let Some(require_pull_request) = &branch_protection_rule.require_pull_request {
+        repository_branch_protection.required_pull_request_reviews = match require_pull_request {
+            RequirePullRequest::Enabled(enabled) => {
+                if *enabled {
+                    Some(github::RequiredPullRequestReviews {
+                        dismiss_stale_reviews: false,
+                        require_code_owner_reviews: false,
+                        required_approving_review_count: Some(0),
+                    })
+                } else {
+                    None
+                }
+            },
+            RequirePullRequest::EnabledWithSettings(settings) => {
+                Some(github::RequiredPullRequestReviews {
+                    dismiss_stale_reviews: false,
+                    require_code_owner_reviews: false,
+                    required_approving_review_count: settings.required_approving_review_count,
+                })
+            },
+        };
+    }
+
+    if let Some(required_status_checks) = &branch_protection_rule.required_status_checks {
+        repository_branch_protection.required_status_checks = Some(github::RequiredStatusChecks {
+            strict: false,
+            contexts: required_status_checks.clone(),
+            enforcement_level: None
+        });
+    }
+
+    let result = github::update_branch_protection(octocrab, owner, repo, branch, &repository_branch_protection).await?;
+    println!("{:?}", result);
+
+    Ok(())
+}
+
 impl Default for RepoConfig {
     fn default() -> Self {
         Self::new()
@@ -639,12 +728,17 @@ mod tests {
                     reviewers:
                         - aisrael
                         - gitsudo-io/a-team
+            branch_protection_rules:
+                main:
+                    require_pull_request:
+                        required_approving_review_count: 1
             "#,
         )
         .unwrap();
         println!("repo_config: {:?}", repo_config);
+        println!("repo_config: {:?}", repo_config.branch_protection_rules);
 
-        () = repo_config
+        repo_config
             .apply(
                 github_token.as_str(),
                 &"gitsudo-io".to_string(),

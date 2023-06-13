@@ -163,6 +163,20 @@ pub struct RepositoryBranchProtection {
     pub required_signatures: Option<RequiredSignatures>,
 }
 
+impl RepositoryBranchProtection {
+    pub fn new() -> RepositoryBranchProtection {
+        RepositoryBranchProtection {
+            name: None,
+            required_status_checks: None,
+            enforce_admins: None,
+            required_pull_request_reviews: None,
+            restrictions: None,
+            required_linear_history: None,
+            required_signatures: None,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RequiredStatusChecks {
     pub strict: bool,
@@ -180,6 +194,7 @@ pub struct EnforceAdmins {
 pub struct RequiredPullRequestReviews {
     pub dismiss_stale_reviews: bool,
     pub require_code_owner_reviews: bool,
+    pub required_approving_review_count: Option<u8>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
