@@ -564,7 +564,7 @@ async fn apply_branch_protection_rules(
     branch_protection_rules: &HashMap<String, BranchProtectionRule>,
 ) -> Result<()> {
     for (branch, branch_protection_rule) in branch_protection_rules {
-        apply_branch_protection_rule(octocrab, owner, repo, &branch, branch_protection_rule).await?
+        apply_branch_protection_rule(octocrab, owner, repo, branch, branch_protection_rule).await?
     }
 
     Ok(())
@@ -577,7 +577,6 @@ async fn apply_branch_protection_rule(
     branch: &str,
     branch_protection_rule: &BranchProtectionRule,
 ) -> Result<()> {
-
     let mut repository_branch_protection = github::RepositoryBranchProtection::new();
 
     if let Some(require_pull_request) = &branch_protection_rule.require_pull_request {
@@ -592,14 +591,14 @@ async fn apply_branch_protection_rule(
                 } else {
                     None
                 }
-            },
+            }
             RequirePullRequest::EnabledWithSettings(settings) => {
                 Some(github::RequiredPullRequestReviews {
                     dismiss_stale_reviews: false,
                     require_code_owner_reviews: false,
                     required_approving_review_count: settings.required_approving_review_count,
                 })
-            },
+            }
         };
     }
 
@@ -607,11 +606,18 @@ async fn apply_branch_protection_rule(
         repository_branch_protection.required_status_checks = Some(github::RequiredStatusChecks {
             strict: false,
             contexts: required_status_checks.clone(),
-            enforcement_level: None
+            enforcement_level: None,
         });
     }
 
-    let result = github::update_branch_protection(octocrab, owner, repo, branch, &repository_branch_protection).await?;
+    let result = github::update_branch_protection(
+        octocrab,
+        owner,
+        repo,
+        branch,
+        &repository_branch_protection,
+    )
+    .await?;
     println!("{:?}", result);
 
     Ok(())

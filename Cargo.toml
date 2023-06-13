@@ -1,6 +1,6 @@
 [package]
 name = "ghctl"
-version = "0.2"
+version = "0.2.0"
 edition = "2021"
 description = "A GitHub command line utility"
 documentation = "https://docs.rs/ghctl"
