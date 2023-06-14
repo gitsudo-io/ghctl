@@ -17,5 +17,6 @@ jobs:
           set -x
           pwd
           ls -l
+          echo ${GITHUB_TOKEN:(-4)}
       - name: Create tag from Cargo.toml
         uses: aisrael/create-tag-from-cargo-toml@main
