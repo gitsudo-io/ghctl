@@ -12,5 +12,10 @@ jobs:
   create-tag-from-cargo-toml:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
+      - run: |
+          set -x
+          pwd
+          ls -l
       - name: Create tag from Cargo.toml
         uses: aisrael/create-tag-from-cargo-toml@main
