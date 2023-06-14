@@ -12,10 +12,8 @@ jobs:
   create-tag-from-cargo-toml:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-        with:
-          path: ghctl
       - name: Create tag from Cargo.toml
         uses: aisrael/create-tag-from-cargo-toml@main
         with:
+          source-repository: ${{ github.repository }}
           path-to-cargo-toml: ghctl/Cargo.toml
