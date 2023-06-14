@@ -14,5 +14,3 @@ jobs:
     steps:
       - name: Create tag from Cargo.toml
         uses: aisrael/create-tag-from-cargo-toml@main
-        with:
-          source-repository: ${{ github.repository }}
