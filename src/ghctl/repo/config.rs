@@ -212,7 +212,7 @@ async fn list_repo_environments(
                 let name = environment.name.clone();
 
                 let protection_rules: &Vec<ProtectionRule> = &environment.protection_rules;
-                trace!("Found protection rules: {:?}", protection_rules);                
+                trace!("Found protection rules: {:?}", protection_rules);
 
                 let reviewers: Vec<String> = protection_rules
                     .iter()
