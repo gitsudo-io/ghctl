@@ -1,12 +1,16 @@
 use anyhow::Result;
 use http::{HeaderName, StatusCode};
-use log::{debug, error, info, warn};
-use octocrab::models::TeamId;
+use log::Level::Trace;
+use log::{debug, error, info, log_enabled, trace, warn};
+use octocrab::models::repos::{ProtectionRule, Reviewer};
+use octocrab::models::{Permissions, Repository, TeamId};
+use octocrab::repos::RepoHandler;
 use octocrab::{models::UserId, params::teams::Permission};
 use octocrab::{Octocrab, OctocrabBuilder};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::ghctl;
 use crate::github;
 use crate::utils::split_some_repo_full_name;
 use github::AddRepositoryCollaboratorResult;
@@ -14,9 +18,13 @@ use github::AddRepositoryCollaboratorResult;
 /// A struct that represents the ghctl configuration for a GitHub repository
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RepoConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub teams: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub collaborators: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub environments: Option<HashMap<String, RepoEnvironment>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub branch_protection_rules: Option<HashMap<String, BranchProtectionRule>>,
 }
 
@@ -50,7 +58,7 @@ pub struct RequiredStatusChecks {
 }
 
 /// The `repo config get` command
-pub async fn get(context: &crate::ghctl::Context, repo_full_name: &String) -> Result<()> {
+pub async fn get(context: &ghctl::Context, repo_full_name: &String) -> Result<()> {
     let (owner, repo) = split_some_repo_full_name(repo_full_name)?;
 
     let octocrab = OctocrabBuilder::default()
@@ -65,16 +73,188 @@ pub async fn get(context: &crate::ghctl::Context, repo_full_name: &String) -> Re
         )
         .build()?;
 
-    match octocrab.repos(owner, repo).get().await {
-        Ok(repo) => {
-            println!("{}", serde_json::to_string_pretty(&repo).unwrap());
-        }
+    let repo_handler = octocrab.repos(owner, repo);
+
+    match repo_handler.get().await {
+        Ok(repository) => do_repo_config_get(&octocrab, repo_handler, &repository).await?,
         Err(e) => {
             error!("Error: {}", e);
         }
     }
 
     Ok(())
+}
+
+async fn do_repo_config_get(
+    octocrab: &Octocrab,
+    repo_handler: RepoHandler<'_>,
+    repository: &Repository,
+) -> Result<()> {
+    let teams = list_repo_teams(octocrab, &repo_handler).await?;
+    let collaborators = list_repo_collaborators(octocrab, &repo_handler).await?;
+    let environments = list_repo_environments(&repo_handler, repository).await?;
+    let repo_config = RepoConfig {
+        teams,
+        collaborators,
+        environments,
+        branch_protection_rules: None,
+    };
+
+    println!("{}", serde_yaml::to_string(&repo_config)?);
+
+    Ok(())
+}
+
+async fn list_repo_teams(
+    octocrab: &Octocrab,
+    repo_handler: &RepoHandler<'_>,
+) -> Result<Option<HashMap<String, String>>> {
+    let teams = octocrab
+        .all_pages(repo_handler.list_teams().send().await?)
+        .await?;
+    if log_enabled!(Trace) {
+        for team in &teams {
+            trace!(
+                "Found team \"{}\" ({}) with \"{}\" permission",
+                team.name,
+                team.id,
+                team.permission
+            );
+        }
+    } else {
+        debug!("Found {} teams", teams.len());
+    }
+
+    Ok(if teams.is_empty() {
+        None
+    } else {
+        let map = teams
+            .iter()
+            .map(|team| (team.slug.clone(), team.permission.clone()))
+            .collect();
+        Some(map)
+    })
+}
+
+async fn list_repo_collaborators(
+    octocrab: &Octocrab,
+    repo_handler: &RepoHandler<'_>,
+) -> Result<Option<HashMap<String, String>>> {
+    let collaborators = octocrab
+        .all_pages(repo_handler.list_collaborators().send().await?)
+        .await?;
+    if log_enabled!(Trace) {
+        for collaborator in &collaborators {
+            trace!(
+                "Found collaborator \"{}\" ({}) with permissions \"{:?}\"",
+                collaborator.author.login,
+                collaborator.author.id,
+                collaborator.permissions
+            );
+        }
+    } else {
+        debug!("Found {} collaborators", collaborators.len());
+    }
+
+    Ok(if collaborators.is_empty() {
+        None
+    } else {
+        let map = collaborators
+            .iter()
+            .map(|collaborator| {
+                let username = collaborator.author.login.clone();
+                let permission = permissions_to_single_value(&collaborator.permissions);
+                (username, permission)
+            })
+            .collect();
+
+        Some(map)
+    })
+}
+
+fn permissions_to_single_value(permissions: &Permissions) -> String {
+    String::from(if permissions.admin {
+        "admin"
+    } else if permissions.maintain {
+        "maintain"
+    } else if permissions.push {
+        "push"
+    } else if permissions.triage {
+        "triage"
+    } else if permissions.pull {
+        "pull"
+    } else {
+        "unknown"
+    })
+}
+
+async fn list_repo_environments(
+    repo_handler: &RepoHandler<'_>,
+    repository: &Repository,
+) -> Result<Option<HashMap<String, RepoEnvironment>>> {
+    debug!("Listing environments");
+    let list_environments = repo_handler.list_environments().send().await?;
+    let environments = list_environments.environments;
+    if log_enabled!(Trace) {
+        for environment in &environments {
+            trace!("Found environment:\n{:?}", environment);
+        }
+    } else {
+        debug!("Found {} environments", environments.len());
+    }
+
+    Ok(if environments.is_empty() {
+        None
+    } else {
+        let map: HashMap<String, RepoEnvironment> = environments
+            .iter()
+            .map(|environment| {
+                let name = environment.name.clone();
+
+                let protection_rules: &Vec<ProtectionRule> = &environment.protection_rules;
+                trace!("Found protection rules: {:?}", protection_rules);                
+
+                let reviewers: Vec<String> = protection_rules
+                    .iter()
+                    .filter(|rule| matches!(rule, ProtectionRule::RequiredReviewers(_)))
+                    .flat_map(|rule| match rule {
+                        ProtectionRule::RequiredReviewers(reviewers) => reviewers
+                            .reviewers
+                            .iter()
+                            .map(|reviewer: &Reviewer| match reviewer {
+                                Reviewer::User(reviewer) => reviewer.reviewer.login.clone(),
+                                Reviewer::Team(reviewer) => format!(
+                                    "{}/{}",
+                                    match reviewer.reviewer.organization.as_ref() {
+                                        Some(org) => org.login.clone(),
+                                        None => repository.owner.as_ref().unwrap().login.clone(),
+                                    },
+                                    reviewer.reviewer.slug
+                                ),
+                                &_ => todo!(),
+                            })
+                            .collect(),
+                        _ => vec![],
+                    })
+                    .collect();
+
+                let reviewer_names = if reviewers.is_empty() {
+                    None
+                } else {
+                    Some(reviewers)
+                };
+
+                let repo_environment = RepoEnvironment {
+                    reviewers: reviewer_names,
+                };
+                (name, repo_environment)
+            })
+            .collect();
+
+        println!("Found {} environments", map.values().len());
+
+        Some(map)
+    })
 }
 
 /// The `repo config apply` command
@@ -837,5 +1017,53 @@ mod tests {
         assert_eq!(reviewers.len(), 2);
         assert!(reviewers.contains(&"alice".to_string()));
         assert!(reviewers.contains(&"bob".to_string()));
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use octocrab::OctocrabBuilder;
+    use std::env;
+
+    fn init() {
+        env_logger::builder()
+            .target(env_logger::Target::Stdout)
+            .try_init()
+            .unwrap_or_default();
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_repo_list_environments() {
+        init();
+        let github_token = env::var("GITHUB_TOKEN").unwrap();
+
+        let octocrab = OctocrabBuilder::default()
+            .personal_token(github_token)
+            .add_header(
+                HeaderName::from_static("accept"),
+                "application/vnd.github.v3.repository+json".to_string(),
+            )
+            .add_header(
+                HeaderName::from_static("x-github-api-version"),
+                "2022-11-28".to_string(),
+            )
+            .build()
+            .unwrap();
+
+        let list_environments = octocrab
+            .repos("gitsudo-io", "gitsudo")
+            .list_environments()
+            .send()
+            .await
+            .unwrap();
+        let environments = list_environments.environments;
+
+        println!("Got {} environments", environments.len());
+
+        for environment in environments {
+            println!("{:?}", environment);
+        }
     }
 }
