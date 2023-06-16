@@ -831,7 +831,12 @@ async fn apply_branch_protection_rule(
     .await;
 
     match result {
-        Ok(repository_branch_protection) => debug!("{:?}", repository_branch_protection),
+        Ok(repository_branch_protection) => {
+            info!(
+                "Applied branch protection rules to branch {branch} in repository {owner}/{repo}"
+            );
+            debug!("{:?}", repository_branch_protection);
+        }
         Err(e) => {
             debug!(
                 "{}",
