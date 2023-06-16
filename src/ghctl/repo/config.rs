@@ -35,7 +35,9 @@ pub struct RepoEnvironment {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BranchProtectionRule {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub require_pull_request: Option<RequirePullRequest>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub required_status_checks: Option<RequiredStatusChecks>,
 }
 
@@ -76,7 +78,7 @@ pub async fn get(context: &ghctl::Context, repo_full_name: &String) -> Result<()
     let repo_handler = octocrab.repos(owner, repo);
 
     match repo_handler.get().await {
-        Ok(repository) => do_repo_config_get(&octocrab, repo_handler, &repository).await?,
+        Ok(repository) => do_repo_config_get(&octocrab, &repository, repo_handler).await?,
         Err(e) => {
             error!("Error: {}", e);
         }
@@ -87,17 +89,19 @@ pub async fn get(context: &ghctl::Context, repo_full_name: &String) -> Result<()
 
 async fn do_repo_config_get(
     octocrab: &Octocrab,
-    repo_handler: RepoHandler<'_>,
     repository: &Repository,
+    repo_handler: RepoHandler<'_>,
 ) -> Result<()> {
     let teams = list_repo_teams(octocrab, &repo_handler).await?;
     let collaborators = list_repo_collaborators(octocrab, &repo_handler).await?;
-    let environments = list_repo_environments(&repo_handler, repository).await?;
+    let environments = list_repo_environments(repository, &repo_handler).await?;
+    let branch_protection_rules =
+        list_branch_protection_rules(octocrab, repository, &repo_handler).await?;
     let repo_config = RepoConfig {
         teams,
         collaborators,
         environments,
-        branch_protection_rules: None,
+        branch_protection_rules,
     };
 
     println!("{}", serde_yaml::to_string(&repo_config)?);
@@ -189,8 +193,8 @@ fn permissions_to_single_value(permissions: &Permissions) -> String {
 }
 
 async fn list_repo_environments(
-    repo_handler: &RepoHandler<'_>,
     repository: &Repository,
+    repo_handler: &RepoHandler<'_>,
 ) -> Result<Option<HashMap<String, RepoEnvironment>>> {
     debug!("Listing environments");
     let list_environments = repo_handler.list_environments().send().await?;
@@ -255,6 +259,74 @@ async fn list_repo_environments(
 
         Some(map)
     })
+}
+
+async fn list_branch_protection_rules(
+    octocrab: &Octocrab,
+    repository: &Repository,
+    repo_handler: &RepoHandler<'_>,
+) -> Result<Option<HashMap<String, BranchProtectionRule>>> {
+    debug!("Listing environments");
+    let protected_branches = octocrab
+        .all_pages(repo_handler.list_branches().protected(true).send().await?)
+        .await?;
+    debug!("Found {} protected branches", protected_branches.len());
+
+    if protected_branches.is_empty() {
+        return Ok(None);
+    }
+
+    let futures = protected_branches.iter().map(|branch| async move {
+        trace!("Found protected branch:\n{:?}", branch);
+
+        let owner = &repository.owner.as_ref().unwrap().login;
+
+        let branch_protection =
+            github::get_branch_protection(octocrab, owner, &repository.name, &branch.name)
+                .await
+                .unwrap();
+
+        let require_pull_request =
+            branch_protection
+                .required_pull_request_reviews
+                .map(|required_pull_request_reviews| {
+                    let required_approving_review_count = required_pull_request_reviews
+                        .required_approving_review_count
+                        .unwrap_or(0);
+                    if required_approving_review_count > 0 {
+                        RequirePullRequest::EnabledWithSettings(RequirePullRequestSettings {
+                            required_approving_review_count: required_pull_request_reviews
+                                .required_approving_review_count,
+                        })
+                    } else {
+                        RequirePullRequest::Enabled(true)
+                    }
+                });
+
+        let required_status_checks =
+            branch_protection
+                .required_status_checks
+                .map(|checks| RequiredStatusChecks {
+                    strict: Some(checks.strict),
+                    contexts: Some(checks.contexts),
+                });
+
+        (
+            branch.name.clone(),
+            BranchProtectionRule {
+                require_pull_request,
+                required_status_checks,
+            },
+        )
+    });
+
+    let branch_protection_rules: HashMap<String, BranchProtectionRule> =
+        futures::future::join_all(futures)
+            .await
+            .into_iter()
+            .collect();
+
+    Ok(Some(branch_protection_rules))
 }
 
 /// The `repo config apply` command
