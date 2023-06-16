@@ -37,7 +37,7 @@ curl -L https://github.com/gitsudo-io/ghctl/releases/download/v0.1.3/ghctl > ghc
 
 Then make the file executable (`chmod u+x ghctl`) and place it in your `$PATH`.
 
-
+ 
 ### Install using Cargo
 
 To install the `ghctl` binary using Cargo, you will need to have Rust 1.66.0 or later installed ([rustup](https://rustup.rs/)).
@@ -64,9 +64,9 @@ cargo install --path ghctl
 ```
 
 
-### Usage
+## Usage
 
-#### Retrieve GitHub repository information
+### Retrieve GitHub repository information
 
 `ghctl repo get "{owner}/{repo}"` will retrieve information about the specified GitHub repository and output it as JSON.
 
@@ -85,14 +85,14 @@ ghctl repo get gitsudo-io/ghctl
 ```
 
 
-#### Apply a GitHub repository configuration to a repository
+### Apply a GitHub repository configuration to a repository
 
 `ghctl repo apply "{owner}/{repo}" --config-file {config_file}` will read the specified YAML configuration file and apply it to the specified GitHub repository.
 
 The configuration file should be a YAML file and currently supports the following sections:
 
 
-##### Repository team permissions
+#### Repository team permissions
 
 ```yaml
 teams:
@@ -111,7 +111,7 @@ teams:
 When applied to a repository, will grant the `a-team` team `maintain` permissions on the repository.
 
 
-##### Repository collaborators
+#### Repository collaborators
 
 ```yaml
 collaborators:
@@ -127,7 +127,7 @@ collaborators:
   aisrael: admin
 ```
 
-##### Deployment Environments
+#### Deployment Environments
 
 ```yaml
 environments:
@@ -139,10 +139,52 @@ environments:
 
 Where `{environment}` is the name of the deployment environment, `{username}` is the GitHub username, or, if `{org}/{team-slug}` is given, then it references a GitHub organization and team.
 
+**Example:**
+
+```yaml
+environments:
+  gigalixir:
+    reviewers:
+      - aisrael
+      - gitsudo-io/a-team
+```
+
 When applied to a repository, will create the deployment environment and configure its reviewers accordingly.
 
+#### Branch Protection Rules
 
-##### Full example
+```yaml
+branch_protection_rules:
+  {branch name}:
+    required_status_checks:
+      contexts:
+        - {status check name}
+        - ...
+    require_pull_request: true
+```
+
+Where `{branch name}` is the name of the branch to protect.
+
+The `required_status_checks` is optional, and if given, will require the specified status checks to pass before allowing a branch to be merged. Specify any required status checks by name in the `contexts` list.
+
+The `require_pull_request` is optional, and if given, will require all commits to be made via a pull request.
+
+**Example:**
+
+```yaml
+branch_protection_rules:
+  main:
+    required_status_checks:
+      contexts:
+        - "mix/test"
+        - "mix/credo"
+    require_pull_request: true
+```
+
+When applied to a repositody, will protect the `main` branch and require a pull request before merging, and require the `mix/test` and `mix/credo` status checks to pass before allowing a branch to be merged.
+
+
+#### Full example
 
 Given a `gitsudo.yaml` file containing:
 
@@ -156,16 +198,28 @@ environments:
     reviewers:
       - aisrael
       - gitsudo-io/a-team
+branch_protection_rules:
+  main:
+    required_status_checks:
+      contexts:
+        - "mix/test"
+    require_pull_request: true
 ```
 
 When we execute:
 
 ```bash
-$ ghctl repo config apply gitsudo-io/gitsudo --access-token ${GHCTL_ACCESS_TOKEN} -F gitsudo.yaml
-[2023-06-06T01:47:11Z INFO ] Added team a-team with permission Maintain to repository gitsudo-io/gitsudo
-[2023-06-06T01:47:11Z INFO ] Updated collaborator aisrael with permission admin to repository gitsudo-io/gitsudo
-[2023-06-06T01:47:11Z INFO ] Created deployment environment gigalixir in repository gitsudo-io/gitsudo
-[2023-06-06T01:47:11Z INFO ] Applied configuration to gitsudo-io/gitsudo
+ghctl repo config apply gitsudo-io/gitsudo --access-token ${GHCTL_ACCESS_TOKEN} -F gitsudo.yaml
+```
+
+Then we should see output similar to the following:
+
+```
+[2023-06-16T18:33:34Z INFO ] Added team a-team with permission Maintain to repository gitsudo-io/gitsudo
+[2023-06-16T18:33:34Z INFO ] Updated collaborator aisrael with permission admin to repository gitsudo-io/gitsudo
+[2023-06-16T18:33:34Z INFO ] Created deployment environment gigalixir in repository gitsudo-io/gitsudo
+[2023-06-16T18:33:35Z INFO ] Applied branch protection rules to branch main in repository gitsudo-io/gitsudo
+[2023-06-16T18:33:35Z INFO ] Applied configuration to gitsudo-io/gitsudo
 ```
 
 
