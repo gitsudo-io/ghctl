@@ -8,6 +8,7 @@ use octocrab::{models::UserId, params::teams::Permission};
 use octocrab::{Octocrab, OctocrabBuilder};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::hash::Hash;
 
 use crate::ghctl;
 use crate::github;
@@ -94,7 +95,8 @@ async fn do_repo_config_get(
     let owner = &repository.owner.as_ref().unwrap().login;
     let repo = &repository.name;
     let teams = list_repo_teams(octocrab, owner, repo).await?;
-    let collaborators = list_repo_collaborators(octocrab, owner, repo).await?;
+    let collaborators = list_repo_collaborators(octocrab, owner, repo, &teams).await?;
+
     let environments = list_repo_environments(octocrab, repository).await?;
     let branch_protection_rules =
         list_branch_protection_rules(octocrab, repository, &repo_handler).await?;
@@ -140,14 +142,29 @@ async fn list_repo_teams(
     })
 }
 
+fn compare_permissions(permission_a: &str, permission_b: &str) -> i64 {
+    let a = match permission_from_s(permission_a) {
+        Some(v) => v,
+        None => return 1,
+    };
+
+    let b = match permission_from_s(permission_b) {
+        Some(v) => v,
+        None => return -1,
+    };
+
+    a as i64 - b as i64
+}
+
 async fn list_repo_collaborators(
     octocrab: &Octocrab,
     owner: &str,
     repo: &str,
+    teams: &Option<HashMap<String, String>>,
 ) -> Result<Option<HashMap<String, String>>> {
-    let collaborators = github::list_collaborators(octocrab, owner, repo).await?;
+    let all_collaborators = github::list_collaborators(octocrab, owner, repo).await?;
     if log_enabled!(Trace) {
-        for collaborator in &collaborators {
+        for collaborator in &all_collaborators {
             trace!(
                 "Found collaborator \"{}\" ({}) with permissions \"{:?}\"",
                 collaborator.author.login,
@@ -156,8 +173,33 @@ async fn list_repo_collaborators(
             );
         }
     } else {
-        debug!("Found {} collaborators", collaborators.len());
+        debug!("Found {} collaborators", all_collaborators.len());
     }
+
+    let mut teams_members: HashMap<String, (String, String)> = HashMap::new();
+
+    if let Some(teams) = teams {
+        for (team_slug, permission) in teams {
+            let members = octocrab
+                .all_pages(octocrab.teams(owner).members(team_slug).send().await?)
+                .await?;
+            for member in members {
+                teams_members.insert(member.login, (team_slug.clone(), permission.clone()));
+            }
+        }
+    };
+
+    let collaborators: Vec<&github::Collaborator> = all_collaborators.iter().filter(|collaborator| {
+        match teams_members.get(&collaborator.author.login) {
+            Some((_, permission)) => {
+                compare_permissions(
+                    permission,
+                    &permissions_to_single_value(&collaborator.permissions),
+                ) > 0
+            }
+            None => false,
+        }
+    }).collect();
 
     Ok(if collaborators.is_empty() {
         None
