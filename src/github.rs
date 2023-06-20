@@ -39,62 +39,16 @@ pub async fn get_user(access_token: &str, username: &str) -> Result<Account> {
     }
 }
 
-#[derive(serde::Serialize)]
-pub struct ListTeamsBuilder<'r> {
-    #[serde(skip)]
-    octocrab: &'r octocrab::Octocrab,
-    #[serde(skip)]
-    owner: &'r str,
-    #[serde(skip)]
-    repo: &'r str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    per_page: Option<u8>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    page: Option<u32>,
-}
-
-impl<'r> ListTeamsBuilder<'r> {
-    pub fn new(octocrab: &'r octocrab::Octocrab, owner: &'r str, repo: &'r str) -> Self {
-        Self {
-            octocrab,
-            owner,
-            repo,
-            per_page: None,
-            page: None,
-        }
-    }
-
-    /// Results per page (max 100).
-    pub fn per_page(mut self, per_page: impl Into<u8>) -> Self {
-        self.per_page = Some(per_page.into());
-        self
-    }
-
-    /// Page number of the results to fetch.
-    pub fn page(mut self, page: impl Into<u32>) -> Self {
-        self.page = Some(page.into());
-        self
-    }
-
-    /// Sends the actual request.
-    pub async fn send(self) -> octocrab::Result<octocrab::Page<octocrab::models::teams::Team>> {
-        let route = format!(
-            "/repos/{owner}/{repo}/teams",
-            owner = self.owner,
-            repo = self.repo
-        );
-        self.octocrab.get(route, Some(&self)).await
-    }
-}
-
 /// Implementing this here until Octocrab PR (https://github.com/XAMPPRocky/octocrab/pull/395) is merged
 pub async fn list_teams(
     octocrab: &Octocrab,
     owner: &str,
     repo: &str,
 ) -> octocrab::Result<Vec<octocrab::models::teams::Team>> {
+    let route = format!("/repos/{owner}/{repo}/teams");
+
     octocrab
-        .all_pages(ListTeamsBuilder::new(octocrab, owner, repo).send().await?)
+        .all_pages(octocrab.get(route, NO_PARAMETERS).await?)
         .await
 }
 
@@ -104,54 +58,6 @@ pub struct Collaborator {
     #[serde(flatten)]
     pub author: octocrab::models::Author,
     pub permissions: octocrab::models::Permissions,
-}
-
-#[derive(serde::Serialize)]
-pub struct ListCollaboratorsBuilder<'r> {
-    #[serde(skip)]
-    octocrab: &'r octocrab::Octocrab,
-    #[serde(skip)]
-    owner: &'r str,
-    #[serde(skip)]
-    repo: &'r str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    per_page: Option<u8>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    page: Option<u32>,
-}
-
-impl<'r> ListCollaboratorsBuilder<'r> {
-    pub fn new(octocrab: &'r octocrab::Octocrab, owner: &'r str, repo: &'r str) -> Self {
-        Self {
-            octocrab,
-            owner,
-            repo,
-            per_page: None,
-            page: None,
-        }
-    }
-
-    /// Results per page (max 100).
-    pub fn per_page(mut self, per_page: impl Into<u8>) -> Self {
-        self.per_page = Some(per_page.into());
-        self
-    }
-
-    /// Page number of the results to fetch.
-    pub fn page(mut self, page: impl Into<u32>) -> Self {
-        self.page = Some(page.into());
-        self
-    }
-
-    /// Sends the actual request.
-    pub async fn send(self) -> octocrab::Result<octocrab::Page<Collaborator>> {
-        let route = format!(
-            "/repos/{owner}/{repo}/collaborators",
-            owner = self.owner,
-            repo = self.repo
-        );
-        self.octocrab.get(route, Some(&self)).await
-    }
 }
 
 /// Implementing this here until Octocrab PR (https://github.com/XAMPPRocky/octocrab/pull/395) is merged
