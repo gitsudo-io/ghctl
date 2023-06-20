@@ -7,8 +7,7 @@ use octocrab::repos::RepoHandler;
 use octocrab::{models::UserId, params::teams::Permission};
 use octocrab::{Octocrab, OctocrabBuilder};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::hash::Hash;
+use std::collections::{HashMap, HashSet};
 
 use crate::ghctl;
 use crate::github;
@@ -94,6 +93,7 @@ async fn do_repo_config_get(
 ) -> Result<()> {
     let owner = &repository.owner.as_ref().unwrap().login;
     let repo = &repository.name;
+
     let teams = list_repo_teams(octocrab, owner, repo).await?;
     let collaborators = list_repo_collaborators(octocrab, owner, repo, &teams).await?;
 
@@ -162,6 +162,17 @@ async fn list_repo_collaborators(
     repo: &str,
     teams: &Option<HashMap<String, String>>,
 ) -> Result<Option<HashMap<String, String>>> {
+    let org_admins = github::list_org_admins(octocrab, owner).await?;
+    if log_enabled!(Trace) {
+        for org_admin in &org_admins {
+            trace!("Found org admin {}", org_admin.login);
+        }
+    } else {
+        debug!("Found {} org admins for {owner}", org_admins.len());
+    }
+    let org_admins_hash_set: HashSet<String> =
+        HashSet::from_iter(org_admins.iter().map(|admin| admin.login.clone()));
+
     let all_collaborators = github::list_collaborators(octocrab, owner, repo).await?;
     if log_enabled!(Trace) {
         for collaborator in &all_collaborators {
@@ -173,7 +184,10 @@ async fn list_repo_collaborators(
             );
         }
     } else {
-        debug!("Found {} collaborators", all_collaborators.len());
+        debug!(
+            "Found {} collaborators for {owner}/{repo}",
+            all_collaborators.len()
+        );
     }
 
     let mut teams_members: HashMap<String, (String, String)> = HashMap::new();
@@ -184,20 +198,45 @@ async fn list_repo_collaborators(
                 .all_pages(octocrab.teams(owner).members(team_slug).send().await?)
                 .await?;
             for member in members {
-                teams_members.insert(member.login, (team_slug.clone(), permission.clone()));
+                let login = &member.login;
+                match teams_members.get(login) {
+                    Some((team_slug, existing_permission)) => {
+                        let cmp = compare_permissions(permission, existing_permission);
+                        trace!("\"{login}\" ({permission}) is already a member of \"{team_slug}\" with permission {existing_permission} (cmp: {cmp}");
+                        if cmp > 0 {
+                            teams_members.insert(login.clone(), (team_slug.clone(), permission.clone()));
+                        }
+                    },
+                    None => {
+                        teams_members.insert(login.clone(), (team_slug.clone(), permission.clone()));
+                    }
+                }
             }
         }
     };
 
     let collaborators: Vec<&github::Collaborator> = all_collaborators.iter().filter(|collaborator| {
-        match teams_members.get(&collaborator.author.login) {
-            Some((_, permission)) => {
-                compare_permissions(
-                    permission,
-                    &permissions_to_single_value(&collaborator.permissions),
-                ) > 0
+        let user = &collaborator.author.login;
+        let collaborator_permission = &permissions_to_single_value(&collaborator.permissions);
+        trace!("Collaborator {user} ({collaborator_permission})",);
+        if collaborator.permissions.admin && org_admins_hash_set.contains(user) {
+            trace!("{user} is org admin");
+            false
+        } else {
+            match teams_members.get(user) {
+                Some((team_slug, team_permission)) => {
+                    trace!("{user} is member of {team_slug} with permission {team_permission}");
+                    
+                    trace!("{user} collaborator_permission: {collaborator_permission}");
+                    let cmp = compare_permissions(
+                        collaborator_permission,
+                        team_permission,
+                    );
+                    trace!("Found user \"{user}\" ({collaborator_permission}) in team \"{team_slug}\" with team permission {team_permission} (cmp: {cmp})");
+                    cmp > 0
+                }
+                None => true,
             }
-            None => false,
         }
     }).collect();
 

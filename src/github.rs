@@ -39,6 +39,25 @@ pub async fn get_user(access_token: &str, username: &str) -> Result<Account> {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct OrgMemberParameters {
+    role: String,
+}
+
+pub async fn list_org_admins(octocrab: &Octocrab, org: &str) -> Result<Vec<Account>> {
+    let route = format!("/orgs/{org}/members");
+    let parameters = OrgMemberParameters {
+        role: "admin".to_string(),
+    };
+    match octocrab.get(route, Some(&parameters)).await {
+        Ok(accounts) => Ok(accounts),
+        Err(e) => {
+            error!("Error: {}", e);
+            Err(anyhow::anyhow!(e))
+        }
+    }
+}
+
 /// Implementing this here until Octocrab PR (https://github.com/XAMPPRocky/octocrab/pull/395) is merged
 pub async fn list_teams(
     octocrab: &Octocrab,
