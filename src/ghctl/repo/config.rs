@@ -2,7 +2,6 @@ use anyhow::Result;
 use http::{HeaderName, StatusCode};
 use log::Level::Trace;
 use log::{debug, error, info, log_enabled, trace, warn};
-use octocrab::models::repos::{ProtectionRule, Reviewer};
 use octocrab::models::{Permissions, Repository, TeamId};
 use octocrab::repos::RepoHandler;
 use octocrab::{models::UserId, params::teams::Permission};
@@ -13,7 +12,7 @@ use std::collections::HashMap;
 use crate::ghctl;
 use crate::github;
 use crate::utils::split_some_repo_full_name;
-use github::AddRepositoryCollaboratorResult;
+use github::{AddRepositoryCollaboratorResult, ProtectionRule, Reviewer};
 
 /// A struct that represents the ghctl configuration for a GitHub repository
 #[derive(Debug, Serialize, Deserialize)]
@@ -92,9 +91,11 @@ async fn do_repo_config_get(
     repository: &Repository,
     repo_handler: RepoHandler<'_>,
 ) -> Result<()> {
-    let teams = list_repo_teams(octocrab, &repo_handler).await?;
-    let collaborators = list_repo_collaborators(octocrab, &repo_handler).await?;
-    let environments = list_repo_environments(repository, &repo_handler).await?;
+    let owner = &repository.owner.as_ref().unwrap().login;
+    let repo = &repository.name;
+    let teams = list_repo_teams(octocrab, owner, repo).await?;
+    let collaborators = list_repo_collaborators(octocrab, owner, repo).await?;
+    let environments = list_repo_environments(octocrab, repository).await?;
     let branch_protection_rules =
         list_branch_protection_rules(octocrab, repository, &repo_handler).await?;
     let repo_config = RepoConfig {
@@ -111,11 +112,10 @@ async fn do_repo_config_get(
 
 async fn list_repo_teams(
     octocrab: &Octocrab,
-    repo_handler: &RepoHandler<'_>,
+    owner: &str,
+    repo: &str,
 ) -> Result<Option<HashMap<String, String>>> {
-    let teams = octocrab
-        .all_pages(repo_handler.list_teams().send().await?)
-        .await?;
+    let teams = github::list_teams(octocrab, owner, repo).await?;
     if log_enabled!(Trace) {
         for team in &teams {
             trace!(
@@ -142,11 +142,10 @@ async fn list_repo_teams(
 
 async fn list_repo_collaborators(
     octocrab: &Octocrab,
-    repo_handler: &RepoHandler<'_>,
+    owner: &str,
+    repo: &str,
 ) -> Result<Option<HashMap<String, String>>> {
-    let collaborators = octocrab
-        .all_pages(repo_handler.list_collaborators().send().await?)
-        .await?;
+    let collaborators = github::list_collaborators(octocrab, owner, repo).await?;
     if log_enabled!(Trace) {
         for collaborator in &collaborators {
             trace!(
@@ -193,11 +192,16 @@ fn permissions_to_single_value(permissions: &Permissions) -> String {
 }
 
 async fn list_repo_environments(
+    octocrab: &Octocrab,
     repository: &Repository,
-    repo_handler: &RepoHandler<'_>,
 ) -> Result<Option<HashMap<String, RepoEnvironment>>> {
     debug!("Listing environments");
-    let list_environments = repo_handler.list_environments().send().await?;
+    let list_environments = github::list_environments(
+        octocrab,
+        &repository.owner.as_ref().unwrap().login,
+        &repository.name,
+    )
+    .await?;
     let environments = list_environments.environments;
     if log_enabled!(Trace) {
         for environment in &environments {
@@ -235,7 +239,6 @@ async fn list_repo_environments(
                                     },
                                     reviewer.reviewer.slug
                                 ),
-                                &_ => todo!(),
                             })
                             .collect(),
                         _ => vec![],
@@ -1129,10 +1132,7 @@ mod test {
             .build()
             .unwrap();
 
-        let list_environments = octocrab
-            .repos("gitsudo-io", "gitsudo")
-            .list_environments()
-            .send()
+        let list_environments = github::list_environments(&octocrab, "gitsudo-io", "gitsudo")
             .await
             .unwrap();
         let environments = list_environments.environments;

@@ -419,6 +419,7 @@ name = "ghctl"
 version = "0.3.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "clap-verbosity-flag",
  "env_logger",
@@ -431,6 +432,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "tokio",
+ "url",
  "version",
 ]
 
@@ -764,8 +766,9 @@ dependencies = [
 
 [[package]]
 name = "octocrab"
-version = "0.25.1"
-source = "git+https://github.com/aisrael/octocrab.git?branch=add-repo-list-environments#9a378c075f788e2114b895b21049a01d20e3611c"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5db170d97e0e88e41faf8ef5277c850d8370c1ef759403c7004a43f2161ce357"
 dependencies = [
  "arc-swap",
  "async-trait",

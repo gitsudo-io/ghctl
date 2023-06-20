@@ -39,6 +39,224 @@ pub async fn get_user(access_token: &str, username: &str) -> Result<Account> {
     }
 }
 
+#[derive(serde::Serialize)]
+pub struct ListTeamsBuilder<'r> {
+    #[serde(skip)]
+    octocrab: &'r octocrab::Octocrab,
+    #[serde(skip)]
+    owner: &'r str,
+    #[serde(skip)]
+    repo: &'r str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    per_page: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    page: Option<u32>,
+}
+
+impl<'r> ListTeamsBuilder<'r> {
+    pub fn new(octocrab: &'r octocrab::Octocrab, owner: &'r str, repo: &'r str) -> Self {
+        Self {
+            octocrab,
+            owner,
+            repo,
+            per_page: None,
+            page: None,
+        }
+    }
+
+    /// Results per page (max 100).
+    pub fn per_page(mut self, per_page: impl Into<u8>) -> Self {
+        self.per_page = Some(per_page.into());
+        self
+    }
+
+    /// Page number of the results to fetch.
+    pub fn page(mut self, page: impl Into<u32>) -> Self {
+        self.page = Some(page.into());
+        self
+    }
+
+    /// Sends the actual request.
+    pub async fn send(self) -> octocrab::Result<octocrab::Page<octocrab::models::teams::Team>> {
+        let route = format!(
+            "/repos/{owner}/{repo}/teams",
+            owner = self.owner,
+            repo = self.repo
+        );
+        self.octocrab.get(route, Some(&self)).await
+    }
+}
+
+/// Implementing this here until Octocrab PR (https://github.com/XAMPPRocky/octocrab/pull/395) is merged
+pub async fn list_teams(
+    octocrab: &Octocrab,
+    owner: &str,
+    repo: &str,
+) -> octocrab::Result<Vec<octocrab::models::teams::Team>> {
+    octocrab
+        .all_pages(ListTeamsBuilder::new(octocrab, owner, repo).send().await?)
+        .await
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct Collaborator {
+    #[serde(flatten)]
+    pub author: octocrab::models::Author,
+    pub permissions: octocrab::models::Permissions,
+}
+
+#[derive(serde::Serialize)]
+pub struct ListCollaboratorsBuilder<'r> {
+    #[serde(skip)]
+    octocrab: &'r octocrab::Octocrab,
+    #[serde(skip)]
+    owner: &'r str,
+    #[serde(skip)]
+    repo: &'r str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    per_page: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    page: Option<u32>,
+}
+
+impl<'r> ListCollaboratorsBuilder<'r> {
+    pub fn new(octocrab: &'r octocrab::Octocrab, owner: &'r str, repo: &'r str) -> Self {
+        Self {
+            octocrab,
+            owner,
+            repo,
+            per_page: None,
+            page: None,
+        }
+    }
+
+    /// Results per page (max 100).
+    pub fn per_page(mut self, per_page: impl Into<u8>) -> Self {
+        self.per_page = Some(per_page.into());
+        self
+    }
+
+    /// Page number of the results to fetch.
+    pub fn page(mut self, page: impl Into<u32>) -> Self {
+        self.page = Some(page.into());
+        self
+    }
+
+    /// Sends the actual request.
+    pub async fn send(self) -> octocrab::Result<octocrab::Page<Collaborator>> {
+        let route = format!(
+            "/repos/{owner}/{repo}/collaborators",
+            owner = self.owner,
+            repo = self.repo
+        );
+        self.octocrab.get(route, Some(&self)).await
+    }
+}
+
+/// Implementing this here until Octocrab PR (https://github.com/XAMPPRocky/octocrab/pull/395) is merged
+pub async fn list_collaborators(
+    octocrab: &Octocrab,
+    owner: &str,
+    repo: &str,
+) -> octocrab::Result<Vec<Collaborator>> {
+    let route = format!("/repos/{owner}/{repo}/collaborators");
+
+    octocrab
+        .all_pages(octocrab.get(route, NO_PARAMETERS).await?)
+        .await
+}
+
+/// Implementing this here until Octocrab PR (https://github.com/XAMPPRocky/octocrab/pull/395) is merged
+pub async fn list_environments(
+    octocrab: &Octocrab,
+    owner: &str,
+    repo: &str,
+) -> octocrab::Result<ListEnvironments> {
+    let route = format!("/repos/{owner}/{repo}/environments");
+
+    octocrab.get(route, NO_PARAMETERS).await
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct ListEnvironments {
+    pub total_count: u64,
+    pub environments: Vec<Environment>,
+}
+
+use chrono::{DateTime, Utc};
+use url::Url;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct Environment {
+    pub id: u64,
+    pub node_id: String,
+    pub name: String,
+    pub url: Url,
+    pub html_url: Url,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub can_admins_bypass: Option<bool>,
+    pub protection_rules: Vec<ProtectionRule>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+#[serde(untagged)]
+pub enum ProtectionRule {
+    WaitTimer(WaitTimer),
+    RequiredReviewers(RequiredReviewers),
+    BranchPolicy(BranchPolicy),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct WaitTimer {
+    pub id: u64,
+    pub node_id: String,
+    pub r#type: String,
+    pub wait_timer: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct RequiredReviewers {
+    pub id: u64,
+    pub node_id: String,
+    pub r#type: String,
+    pub reviewers: Vec<Reviewer>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct BranchPolicy {
+    pub id: u64,
+    pub node_id: String,
+    pub r#type: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+#[serde(tag = "type")]
+pub enum Reviewer {
+    User(Box<AuthorReviewer>),
+    Team(Box<TeamReviewer>),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct AuthorReviewer {
+    pub reviewer: octocrab::models::Author,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct TeamReviewer {
+    pub reviewer: Team,
+}
+
 /// A struct that can be used to partially deserialize the response from the check_team_permissions() GitHub
 /// API call.
 ///
@@ -170,7 +388,6 @@ pub struct RepositoryBranchProtectionRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub required_status_checks: Option<RequiredStatusChecks>,
     pub enforce_admins: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub required_pull_request_reviews: Option<RequiredPullRequestReviews>,
     pub restrictions: Option<Restrictions>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -262,6 +479,11 @@ pub async fn update_branch_protection(
     branch: &str,
     repository_branch_protection_request: &RepositoryBranchProtectionRequest,
 ) -> Result<RepositoryBranchProtection> {
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&repository_branch_protection_request)?
+    );
+
     let route = format!("/repos/{owner}/{repo}/branches/{branch}/protection");
     match octocrab
         .put(route, Some(repository_branch_protection_request))

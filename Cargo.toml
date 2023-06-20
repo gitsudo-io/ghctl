@@ -24,10 +24,16 @@ futures = "0.3.28"
 http = "0.2.9"
 hyper = "0.14.26"
 log = "0.4.18"
-# octocrab = "0.21.0"
-octocrab = { git = "https://github.com/aisrael/octocrab.git", branch = "add-repo-list-environments" }
+octocrab = "0.21.0"
+# octocrab = { git = "https://github.com/aisrael/octocrab.git", branch = "add-repo-list-environments" }
 serde = "1.0.160"
 serde_json = "1.0.96"
 serde_yaml = "0.9.21"
 tokio = { version = "1.28.0", features = ["full"] }
 version = "3.0.0"
+# Needed until Octocrab merges PR
+url = { version = "2.2.2", features = ["serde"] }
+chrono = { version = "0.4.19", default-features = false, features = [
+    "serde",
+    "clock",
+] }
