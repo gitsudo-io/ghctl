@@ -232,7 +232,7 @@ async fn list_repo_collaborators(
             match teams_members.get(user) {
                 Some((team_slug, team_permission)) => {
                     trace!("{user} is member of {team_slug} with permission {team_permission}");
-                    
+
                     trace!("{user} collaborator_permission: {collaborator_permission}");
                     let cmp = compare_permissions(
                         collaborator_permission,
@@ -384,13 +384,17 @@ async fn list_branch_protection_rules(
                         .required_approving_review_count
                         .unwrap_or(0);
                     let dismiss_stale_reviews = required_pull_request_reviews.dismiss_stale_reviews;
-                    let require_code_owner_reviews = required_pull_request_reviews.require_code_owner_reviews;
-                    if required_approving_review_count > 0 || dismiss_stale_reviews || require_code_owner_reviews {
+                    let require_code_owner_reviews =
+                        required_pull_request_reviews.require_code_owner_reviews;
+                    if required_approving_review_count > 0
+                        || dismiss_stale_reviews
+                        || require_code_owner_reviews
+                    {
                         RequirePullRequest::EnabledWithSettings(RequirePullRequestSettings {
                             required_approving_review_count: required_pull_request_reviews
                                 .required_approving_review_count,
                             dismiss_stale_reviews: Some(dismiss_stale_reviews),
-                            require_code_owner_reviews: Some(require_code_owner_reviews)
+                            require_code_owner_reviews: Some(require_code_owner_reviews),
                         })
                     } else {
                         RequirePullRequest::Enabled(true)
