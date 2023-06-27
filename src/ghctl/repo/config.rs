@@ -50,6 +50,10 @@ pub enum RequirePullRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RequirePullRequestSettings {
     pub required_approving_review_count: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dismiss_stale_reviews: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub require_code_owner_reviews: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -204,11 +208,13 @@ async fn list_repo_collaborators(
                         let cmp = compare_permissions(permission, existing_permission);
                         trace!("\"{login}\" ({permission}) is already a member of \"{team_slug}\" with permission {existing_permission} (cmp: {cmp}");
                         if cmp > 0 {
-                            teams_members.insert(login.clone(), (team_slug.clone(), permission.clone()));
+                            teams_members
+                                .insert(login.clone(), (team_slug.clone(), permission.clone()));
                         }
-                    },
+                    }
                     None => {
-                        teams_members.insert(login.clone(), (team_slug.clone(), permission.clone()));
+                        teams_members
+                            .insert(login.clone(), (team_slug.clone(), permission.clone()));
                     }
                 }
             }
@@ -377,10 +383,14 @@ async fn list_branch_protection_rules(
                     let required_approving_review_count = required_pull_request_reviews
                         .required_approving_review_count
                         .unwrap_or(0);
-                    if required_approving_review_count > 0 {
+                    let dismiss_stale_reviews = required_pull_request_reviews.dismiss_stale_reviews;
+                    let require_code_owner_reviews = required_pull_request_reviews.require_code_owner_reviews;
+                    if required_approving_review_count > 0 || dismiss_stale_reviews || require_code_owner_reviews {
                         RequirePullRequest::EnabledWithSettings(RequirePullRequestSettings {
                             required_approving_review_count: required_pull_request_reviews
                                 .required_approving_review_count,
+                            dismiss_stale_reviews: Some(dismiss_stale_reviews),
+                            require_code_owner_reviews: Some(require_code_owner_reviews)
                         })
                     } else {
                         RequirePullRequest::Enabled(true)
