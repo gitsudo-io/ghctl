@@ -38,6 +38,8 @@ pub struct BranchProtectionRule {
     pub require_pull_request: Option<RequirePullRequest>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub required_status_checks: Option<RequiredStatusChecks>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enforce_admins: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -409,11 +411,16 @@ async fn list_branch_protection_rules(
                     contexts: Some(checks.contexts),
                 });
 
+        let enforce_admins = branch_protection.enforce_admins.map(|enforce_admins| {
+            enforce_admins.enabled
+        });
+
         (
             branch.name.clone(),
             BranchProtectionRule {
                 require_pull_request,
                 required_status_checks,
+                enforce_admins,
             },
         )
     });
@@ -990,6 +997,8 @@ async fn apply_branch_protection_rule(
             enforcement_level: None,
         });
     }
+
+    repository_branch_protection.enforce_admins = branch_protection_rule.enforce_admins.unwrap_or(false);
 
     let result = github::update_branch_protection(
         octocrab,
