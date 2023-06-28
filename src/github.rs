@@ -298,12 +298,30 @@ pub async fn add_repository_collaborator(
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RepositoryBranchProtection {
     pub name: Option<String>,
+    pub protection_url: Option<String>,
     pub required_status_checks: Option<RequiredStatusChecks>,
-    pub enforce_admins: Option<EnforceAdmins>,
+    pub enforce_admins: Option<EnabledWithUrl>,
     pub required_pull_request_reviews: Option<RequiredPullRequestReviews>,
     pub restrictions: Option<Restrictions>,
-    pub required_linear_history: Option<RequiredLinearHistory>,
-    pub required_signatures: Option<RequiredSignatures>,
+    pub required_linear_history: Option<Enabled>,
+    pub allow_force_pushes: Option<Enabled>,
+    pub allow_deletions: Option<Enabled>,
+    pub block_creations: Option<Enabled>,
+    pub required_conversation_resolution: Option<Enabled>,
+    pub required_signatures: Option<EnabledWithUrl>,
+    pub lock_branch: Option<Enabled>,
+    pub allow_fork_syncing: Option<Enabled>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EnabledWithUrl {
+    pub url: String,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Enabled {
+    pub enabled: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

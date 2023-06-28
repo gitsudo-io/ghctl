@@ -411,9 +411,9 @@ async fn list_branch_protection_rules(
                     contexts: Some(checks.contexts),
                 });
 
-        let enforce_admins = branch_protection.enforce_admins.map(|enforce_admins| {
-            enforce_admins.enabled
-        });
+        let enforce_admins = branch_protection
+            .enforce_admins
+            .map(|enforce_admins| enforce_admins.enabled);
 
         (
             branch.name.clone(),
@@ -998,7 +998,8 @@ async fn apply_branch_protection_rule(
         });
     }
 
-    repository_branch_protection.enforce_admins = branch_protection_rule.enforce_admins.unwrap_or(false);
+    repository_branch_protection.enforce_admins =
+        branch_protection_rule.enforce_admins.unwrap_or(false);
 
     let result = github::update_branch_protection(
         octocrab,
