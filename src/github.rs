@@ -369,13 +369,28 @@ pub struct EnforceAdmins {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RequiredPullRequestReviews {
+    pub url: Option<String>,
+    pub dismissal_restrictions: Option<Restrictions>,
+    pub bypass_pull_request_allowances: Option<UsersTeamsApps>,
     pub dismiss_stale_reviews: bool,
     pub require_code_owner_reviews: bool,
     pub required_approving_review_count: Option<u8>,
+    pub require_last_push_approval: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UsersTeamsApps {
+    pub users: Vec<Account>,
+    pub teams: Vec<Team>,
+    pub apps: Vec<App>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Restrictions {
+    pub url: String,
+    pub users_url: String,
+    pub teams_url: String,
+    pub apps_url: String,
     pub users: Vec<Account>,
     pub teams: Vec<Team>,
     pub apps: Vec<App>,

@@ -969,9 +969,13 @@ async fn apply_branch_protection_rule(
             RequirePullRequest::Enabled(enabled) => {
                 if *enabled {
                     Some(github::RequiredPullRequestReviews {
+                        url: None,
+                        dismissal_restrictions: None,
+                        bypass_pull_request_allowances: None,
                         dismiss_stale_reviews: false,
                         require_code_owner_reviews: false,
                         required_approving_review_count: Some(0),
+                        require_last_push_approval: None,
                     })
                 } else {
                     None
@@ -979,9 +983,13 @@ async fn apply_branch_protection_rule(
             }
             RequirePullRequest::EnabledWithSettings(settings) => {
                 Some(github::RequiredPullRequestReviews {
+                    url: None,
+                    dismissal_restrictions: None,
+                    bypass_pull_request_allowances: None,
                     dismiss_stale_reviews: false,
                     require_code_owner_reviews: false,
                     required_approving_review_count: settings.required_approving_review_count,
+                    require_last_push_approval: None,
                 })
             }
         };
