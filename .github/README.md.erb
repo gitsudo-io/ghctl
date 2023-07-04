@@ -84,6 +84,40 @@ ghctl repo get gitsudo-io/ghctl
 ...
 ```
 
+### Retrieve a GitHub repository's configuration
+
+`ghctl repo config get "{owner}/{repo}"` will retrieve the configuration for the specified GitHub repository and output it as YAML.
+
+For example:
+
+```
+ghctl repo config get gitsudo-io/ghctl
+```
+
+Will output something like:
+
+```yaml
+teams:
+  a-team: maintain
+environments:
+  gigalixir:
+    reviewers:
+    - aisrael
+    - gitsudo-io/a-team
+branch_protection_rules:
+  main:
+    require_pull_request:
+      required_approving_review_count: 1
+      dismiss_stale_reviews: false
+      require_code_owner_reviews: false
+    required_status_checks:
+      strict: false
+      contexts:
+      - mix/test
+    enforce_admins: false
+```
+
+The output of `ghctl repo config get` is suitable for use with `ghctl repo config apply` (see below).
 
 ### Apply a GitHub repository configuration to a repository
 
