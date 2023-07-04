@@ -32,7 +32,7 @@ gh release download -R gitsudo-io/ghctl --pattern ghctl
 ```
 
 ```
-curl -L https://github.com/gitsudo-io/ghctl/releases/download/v0.1.3/ghctl > ghctl
+curl -L https://github.com/gitsudo-io/ghctl/releases/download/v0.3.1/ghctl > ghctl
 ```
 
 Then make the file executable (`chmod u+x ghctl`) and place it in your `$PATH`.
