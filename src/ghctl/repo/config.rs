@@ -347,8 +347,6 @@ async fn list_repo_environments(
             })
             .collect();
 
-        println!("Found {} environments", map.values().len());
-
         Some(map)
     })
 }
