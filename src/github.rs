@@ -341,7 +341,6 @@ pub struct Enabled {
 pub struct RepositoryBranchProtectionRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub required_status_checks: Option<RequiredStatusChecks>,
     pub enforce_admins: bool,
     pub required_pull_request_reviews: Option<RequiredPullRequestReviews>,
