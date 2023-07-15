@@ -492,10 +492,10 @@ mod tests {
 
     #[tokio::test]
     #[ignore = "Don't run this test unless you have a valid GitHub token in the GITHUB_TOKEN environment variable"]
-    async fn test_github_check_team_permission() {
+    async fn test_github_check_team_permission() -> Result<()>{
         init();
 
-        let github_token = env::var("GITHUB_TOKEN").unwrap();
+        let github_token = env::var("GITHUB_TOKEN")?;
 
         let team_repository_permission = check_team_permissions(
             &github_token,
@@ -504,8 +504,7 @@ mod tests {
             "gitsudo-io",
             "test-repo-alpha",
         )
-        .await
-        .unwrap();
+        .await?.unwrap();
 
         assert!(team_repository_permission.name == "test-repo-alpha");
         assert!(
@@ -518,6 +517,8 @@ mod tests {
                     ("pull".to_string(), true)
                 ])
         );
+
+        Ok(())
     }
 
     #[tokio::test]
