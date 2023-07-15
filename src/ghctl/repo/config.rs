@@ -737,10 +737,7 @@ async fn apply_teams(
     for (team_slug, permission_s) in team_permissions {
         let result =
             github::check_team_permissions(access_token, owner, team_slug, owner, repo).await?;
-        let already_has_permission = match result.permissions.get(permission_s) {
-            Some(v) => *v,
-            None => false,
-        };
+        let already_has_permission = result.map_or(false, |v| v.has_permission(permission_s));
         if already_has_permission {
             info!("Team {team_slug} already has permission {permission_s} on {owner}/{repo}");
             continue;

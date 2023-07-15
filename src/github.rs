@@ -194,6 +194,15 @@ pub struct TeamRepositoryPermission {
     pub permissions: HashMap<String, bool>,
 }
 
+impl TeamRepositoryPermission {
+    pub fn has_permission(&self, permission: &str) -> bool {
+        match self.permissions.get(permission) {
+            Some(v) => *v,
+            _ => false,
+        }
+    }
+}
+
 /// Check a team permission for a GitHub repository
 ///
 /// See: https://docs.github.com/en/rest/teams/teams?apiVersion=2022-11-28#check-team-permissions-for-a-repository
@@ -203,7 +212,7 @@ pub async fn check_team_permissions(
     team_slug: &str,
     owner: &str,
     repo: &str,
-) -> Result<TeamRepositoryPermission> {
+) -> Result<Option<TeamRepositoryPermission>> {
     let octocrab = OctocrabBuilder::default()
         .personal_token(access_token.to_owned())
         .add_header(
@@ -220,8 +229,12 @@ pub async fn check_team_permissions(
     match octocrab.get(route, NO_PARAMETERS).await {
         Ok(team_repository_permission) => Ok(team_repository_permission),
         Err(e) => {
-            error!("Error: {}", e);
-            Err(anyhow::anyhow!(e))
+            if e.to_string().starts_with("GitHub: Not Found") {
+                Ok(None)
+            } else {
+                error!("Error: {}", e);
+                Err(anyhow::anyhow!(e))
+            }
         }
     }
 }
@@ -370,7 +383,9 @@ pub struct EnforceAdmins {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RequiredPullRequestReviews {
     pub url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub dismissal_restrictions: Option<Restrictions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bypass_pull_request_allowances: Option<UsersTeamsApps>,
     pub dismiss_stale_reviews: bool,
     pub require_code_owner_reviews: bool,
