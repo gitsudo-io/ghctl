@@ -38,4 +38,5 @@ jobs:
       - uses: ruby/setup-ruby@v1
       - name: Cucumber + Aruba tests
         run: |
+          bundle install
           cucumber
