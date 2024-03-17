@@ -29,5 +29,3 @@ pub enum Commands {
     Repo(RepoCommand),
     Version,
 }
-
-pub use repo::repo;

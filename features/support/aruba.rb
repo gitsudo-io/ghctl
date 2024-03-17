@@ -13,7 +13,5 @@ end
 Before do
   Dir.chdir(BASEDIR) do
     `cargo build --release`
-    `pwd`
-    `ls -l target/release`
   end
 end

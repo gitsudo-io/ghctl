@@ -6,7 +6,7 @@ use log::error;
 use octocrab::models::Repository;
 use octocrab::OctocrabBuilder;
 
-pub use config::RepoConfig;
+
 
 use crate::utils::split_some_repo_full_name;
 
