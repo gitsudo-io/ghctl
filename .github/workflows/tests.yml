@@ -24,3 +24,13 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
       - run: |
           cargo clippy
+
+  cucumber:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: ruby/setup-ruby@v1
+      - name: Cucumber + Aruba tests
+        run: |
+          cucumber
