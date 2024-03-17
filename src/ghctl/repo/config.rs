@@ -611,7 +611,7 @@ impl RepoConfig {
         if let Some(teams) = self.teams.as_ref() {
             let org = orgs_teams
                 .entry(owner.to_string())
-                .or_insert_with(HashMap::new);
+                .unwrap_or_default(HashMap::new);
 
             for (team_slug, permission) in teams {
                 debug!("Validating permission {permission}");
@@ -663,7 +663,7 @@ impl RepoConfig {
                         } else {
                             let teams = orgs_teams
                                 .entry(org.to_string())
-                                .or_insert_with(HashMap::new);
+                                .unwrap_or_default(HashMap::new);
                             if !teams.contains_key(team_slug) {
                                 debug!("Validating team {team_slug}");
                                 let team = octocrab.teams(org).get(team_slug).await?;
