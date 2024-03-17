@@ -437,7 +437,7 @@ pub async fn apply(
     access_token: &str,
     owner: &str,
     repo: &str,
-    config_files: &Vec<String>,
+    config_files: &[String],
 ) -> Result<()> {
     debug!("Applying configuration to {owner}/{repo}");
 
@@ -502,7 +502,7 @@ where
 {
     if let Some(map1) = map1 {
         if let Some(map2) = map2 {
-            Some(map1.into_iter().chain(map2.into_iter()).collect())
+            Some(map1.into_iter().chain(map2).collect())
         } else {
             Some(map1)
         }
