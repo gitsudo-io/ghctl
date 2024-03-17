@@ -11,6 +11,7 @@ on:
       - "Gemfile"
       - "Gemfile.lock"
       - ".ruby*"
+      - ".github/workflows/tests.yml"
 
 jobs:
   test:
