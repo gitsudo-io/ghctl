@@ -609,9 +609,7 @@ impl RepoConfig {
             .build()?;
 
         if let Some(teams) = self.teams.as_ref() {
-            let org = orgs_teams
-                .entry(owner.to_string())
-                .or_default();
+            let org = orgs_teams.entry(owner.to_string()).or_default();
 
             for (team_slug, permission) in teams {
                 debug!("Validating permission {permission}");
@@ -661,9 +659,7 @@ impl RepoConfig {
                         if org.is_empty() || team_slug.is_empty() {
                             warn!("Invalid {{org}}/{{team}} name: \"{}\"!", reviewer);
                         } else {
-                            let teams = orgs_teams
-                                .entry(org.to_string())
-                                .or_default();
+                            let teams = orgs_teams.entry(org.to_string()).or_default();
                             if !teams.contains_key(team_slug) {
                                 debug!("Validating team {team_slug}");
                                 let team = octocrab.teams(org).get(team_slug).await?;
