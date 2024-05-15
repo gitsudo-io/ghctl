@@ -27,5 +27,6 @@ pub struct Opts {
 pub enum Commands {
     #[command(about = "Manage repository configuration")]
     Repo(RepoCommand),
+    #[command(about = "Display the ghctl version")]
     Version,
 }
