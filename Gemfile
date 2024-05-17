@@ -4,4 +4,4 @@ source 'https://rubygems.org'
 
 gem 'aruba', '~> 2.2.0'
 gem 'cucumber', '~> 9.1.2'
-gem 'rubocop', '~> 1.62.1'
+gem 'rubocop', '~> 1.63.0'
