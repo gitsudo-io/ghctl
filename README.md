@@ -1,7 +1,7 @@
 ghctl - A GitHub utility
 =====
 
-[![Tests](https://github.com/gitsudo-io/ghctl/actions/workflows/tests.yml/badge.svg)](https://github.com/gitsudo-io/ghctl/workflows/tests.yml)
+[![Tests](https://github.com/gitsudo-io/ghctl/actions/workflows/tests.yml/badge.svg)](https://github.com/gitsudo-io/ghctl/actions/workflows/tests.yml)
 
 
 ghctl is both a command-line utility for GitHub, _and_ a GitHub Action that allows you to use the utility in your GitHub Actions workflows.
