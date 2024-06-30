@@ -19,4 +19,4 @@ jobs:
         env:
           RUST_LOG: ghctl=debug
         with:
-            args: repo config apply gitsudo-io/ghctl -F tests/fixtures/ghctl.yaml --access-token ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+            args: repo config apply gitsudo-io/ghctl -F tests/fixtures/ghctl.yaml --access-token ${{ secrets.CUCUMBER_GITHUB_TOKEN }}
