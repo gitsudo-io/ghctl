@@ -1,6 +1,6 @@
 [package]
 name = "ghctl"
-version = "0.3.3"
+version = "0.4.0"
 edition = "2021"
 description = "A GitHub command line utility"
 documentation = "https://docs.rs/ghctl"
@@ -16,20 +16,19 @@ exclude = [
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.71"
-clap = { version = "4.2.5", features = ["cargo", "derive"] }
+anyhow = "1.0.86"
+clap = { version = "4.5.4", features = ["cargo", "derive"] }
 clap-verbosity-flag = "2.0.1"
-env_logger = "0.10.0"
-futures = "0.3.28"
-http = "0.2.9"
-hyper = "0.14.26"
-log = "0.4.18"
-octocrab = "0.29.1"
-# octocrab = { git = "https://github.com/aisrael/octocrab.git", branch = "add-repo-list-environments" }
-serde = "1.0.160"
-serde_json = "1.0.96"
+env_logger = "0.11.3"
+futures = "0.3.30"
+http = "1.0.0"
+hyper = "1.3.0"
+log = "0.4.21"
+octocrab = "0.38.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.118"
 serde_yaml = "0.9.21"
-tokio = { version = "1.28.0", features = ["full"] }
+tokio = { version = "1.38.0", features = ["full"] }
 version = "3.0.0"
 # Needed until Octocrab merges PR
 url = { version = "2.2.2", features = ["serde"] }
@@ -37,3 +36,11 @@ chrono = { version = "0.4.19", default-features = false, features = [
     "serde",
     "clock",
 ] }
+http-body-util = "0.1.2"
+
+[dev-dependencies]
+cucumber = "0.21.1"
+
+[[test]]
+name = "cli"
+harness = false

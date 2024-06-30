@@ -4,19 +4,25 @@ Feature: Basic features
 
     To display the version, just run `ghctl version`
 
-    When I run `ghctl version`
+    When the following command is run:
+    ```
+    ghctl version
+    ```
     Then the output should contain:
-    """
-    ghctl version 0.3.3
-    """
+    ```
+    ghctl version 0.4.0
+    ```
 
   Scenario: Display help
 
     To display help, just run `ghctl` without any arguments.
 
-    When I run `ghctl`
-    Then the output should contain:
-    """
+    When the following command is run:
+    ```
+    ghctl
+    ```
+    Then stderr should contain:
+    ```
     A tool for managing GitHub repository configuration
 
     Usage: ghctl [OPTIONS] <COMMAND>
@@ -28,8 +34,8 @@ Feature: Basic features
 
     Options:
           --access-token <ACCESS_TOKEN>  GitHub access token
-      -v, --verbose...                   More output per occurrence
-      -q, --quiet...                     Less output per occurrence
+      -v, --verbose...                   Increase logging verbosity
+      -q, --quiet...                     Decrease logging verbosity
       -h, --help                         Print help
       -V, --version                      Print version
-    """
+    ```

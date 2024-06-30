@@ -1,0 +1,110 @@
+use core::panic;
+use cucumber::{gherkin::Step, given, then, when, World};
+use log::{debug, info};
+use std::process::Command;
+
+#[derive(Debug, Default, World)]
+pub struct CliWorld {
+    command_output: Option<String>,
+    command_stderr: Option<String>,
+}
+
+#[when(regex = "the following command is run:")]
+async fn run_command(world: &mut CliWorld, step: &Step) {
+    let raw_command = step.docstring().unwrap();
+    debug!("raw_command {}", raw_command);
+    let parts = raw_command.split_whitespace().collect::<Vec<&str>>();
+    assert!(!parts.is_empty(), "No command provided");
+    debug!("Parts: {:?}", parts);
+    let mut args: Vec<&str> = parts[1..].to_vec();
+    debug!("Parts[0]: {}", parts[0]);
+    let executable = if parts[0] == "ghctl" {
+        args.insert(0, "--");
+        args.insert(0, "run");
+        "cargo"
+    } else {
+        parts[0]
+    };
+    debug!("Executable: {}", executable);
+    debug!("Args: {:?}", args);
+
+    match Command::new(executable).args(args).output() {
+        Ok(output) => {
+            debug!("Output: {:?}", output);
+            let stdout = String::from_utf8(output.stdout).unwrap();
+            debug!("stdout: {}", stdout);
+            world.command_output = Some(stdout);
+            let stderr = String::from_utf8(output.stderr).unwrap();
+            debug!("stderr: {}", stderr);
+            world.command_stderr = Some(stderr);
+        }
+        Err(e) => {
+            panic!("Failed to run command: {}", e);
+        }
+    }
+}
+
+#[given(expr = r#"a file named `{word}` containing:"#)]
+async fn a_file_containing(_world: &mut CliWorld, filename: String, step: &Step) {
+    debug!("filename: {:?}", filename);
+    let file_content = step.docstring().unwrap();
+    debug!("file_content: {:?}", file_content);
+}
+
+#[then(expr = "it should exit with status code {int}")]
+async fn it_should_exit_with_status(_world: &mut CliWorld, status: i32) {
+    debug!("status: {:?}", status);
+}
+
+#[then(expr = "it should output:")]
+async fn it_should_output(world: &mut CliWorld, step: &Step) {
+    assert!(world.command_output.is_some());
+    // For some reason, the output docstring has a leading newline
+    let expected_output = step.docstring().unwrap().strip_prefix('\n').unwrap();
+    debug!("expected_output: {:?}", expected_output);
+    let actual_output = world.command_output.as_ref().unwrap();
+    debug!("actual_output: {:?}", actual_output);
+    assert_eq!(expected_output, actual_output);
+}
+
+#[then(expr = "the output should contain:")]
+async fn the_output_should_contain(world: &mut CliWorld, step: &Step) {
+    assert!(world.command_output.is_some());
+    // For some reason, the output docstring has a leading newline
+    let expected_output = step.docstring().unwrap().strip_prefix('\n').unwrap();
+    debug!("expected_output: {:?}", expected_output);
+    let actual_output = world.command_output.as_ref().unwrap();
+    debug!("actual_output: {:?}", actual_output);
+    assert!(actual_output.contains(expected_output));
+}
+
+#[then(expr = "stderr should contain:")]
+async fn stderr_should_contain(world: &mut CliWorld, step: &Step) {
+    assert!(world.command_stderr.is_some());
+    // For some reason, the output docstring has a leading newline
+    let expected_stderr = step.docstring().unwrap().strip_prefix('\n').unwrap();
+    debug!("expected_stderr: {:?}", expected_stderr);
+    let actual_stderr = world.command_stderr.as_ref().unwrap();
+    debug!("actual_stderr: {:?}", actual_stderr);
+    assert!(actual_stderr.contains(expected_stderr));
+}
+
+#[tokio::main]
+async fn main() {
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Trace)
+        .format_target(false)
+        .format_timestamp_secs()
+        .target(env_logger::Target::Stdout)
+        .init();
+    info!("cargo build --release");
+    Command::new("cargo")
+        .args(&["build", "--release"])
+        .status()
+        .expect("Failed to build");
+    let path = std::env::var("PATH").unwrap_or_default();
+    std::env::set_var("PATH", format!("target/release;{}", path));
+    info!("Running CLI tests");
+
+    CliWorld::run("features/cli.feature").await;
+}

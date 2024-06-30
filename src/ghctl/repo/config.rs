@@ -1,5 +1,6 @@
 use anyhow::Result;
 use http::{HeaderName, StatusCode};
+use http_body_util::BodyExt;
 use log::Level::Trace;
 use log::{debug, error, info, log_enabled, trace, warn};
 use octocrab::models::{Permissions, Repository, TeamId};
@@ -906,8 +907,8 @@ async fn apply_environments(
                     info!(
                             "Created deployment environment {environment_name} in repository {owner}/{repo}"
                         );
-                    let body = hyper::body::to_bytes(resp.into_body()).await?;
-                    debug!("{}", String::from_utf8(body.to_vec())?);
+                    let bytes = resp.into_body().collect().await?.to_bytes();
+                    debug!("{}", String::from_utf8(bytes.to_vec())?);
                 }
                 StatusCode::NO_CONTENT => {
                     info!(

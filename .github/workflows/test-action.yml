@@ -1,11 +1,11 @@
 name: Test the Action
-on: 
+on:
   push:
     paths-ignore:
       - .github/README.md.erb
       - README.md
       - LICENSE
-  workflow_dispatch:    
+  workflow_dispatch:
 
 jobs:
   ghctl-repo-config-apply:
@@ -19,4 +19,4 @@ jobs:
         env:
           RUST_LOG: ghctl=debug
         with:
-            args: repo config apply gitsudo-io/ghctl -F test/ghctl.yaml --access-token ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+            args: repo config apply gitsudo-io/ghctl -F tests/fixtures/ghctl.yaml --access-token ${{ secrets.PERSONAL_ACCESS_TOKEN }}

@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use http::{HeaderName, StatusCode};
+use http_body_util::BodyExt;
 use log::error;
 use octocrab::{
     models::{teams::Team, App, UserId},
@@ -298,9 +299,9 @@ pub async fn add_repository_collaborator(
 
     match resp.status() {
         StatusCode::OK | StatusCode::CREATED => {
-            let body = hyper::body::to_bytes(resp.into_body()).await?;
+            let bytes = resp.into_body().collect().await?.to_bytes();
             Ok(AddRepositoryCollaboratorResult::Ok(String::from_utf8(
-                body.to_vec(),
+                bytes.to_vec(),
             )?))
         }
         StatusCode::NO_CONTENT => Ok(AddRepositoryCollaboratorResult::AlreadyExists),
