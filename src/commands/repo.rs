@@ -77,7 +77,7 @@ pub async fn repo(context: &ghctl::Context, repo: &RepoCommand) {
             let (owner, repo_name) = split_repo_full_name(repo_name).unwrap();
             match crate::ghctl::repo::get_repo(&context.access_token, owner, repo_name).await {
                 Ok(repo) => println!("{}", serde_json::to_string_pretty(&repo).unwrap()),
-                Err(e) => error!("Error: {}", e),
+                Err(e) => error!("repo get Error: {}", e),
             }
         }
 

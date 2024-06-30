@@ -9,6 +9,12 @@ pub struct CliWorld {
     command_stderr: Option<String>,
 }
 
+#[given(regex = "a valid GITHUB_TOKEN is set")]
+async fn a_valid_github_token_is_set(_world: &mut CliWorld) {
+    assert!(std::env::vars().any(|(key, _)| key == "GITHUB_TOKEN"),
+"No GITHUB_TOKEN environment variable found. Please set a valid GITHUB_TOKEN environment variable to run the tests.");
+}
+
 #[when(regex = "the following command is run:")]
 async fn run_command(world: &mut CliWorld, step: &Step) {
     let raw_command = step.docstring().unwrap();
@@ -71,7 +77,9 @@ async fn it_should_output(world: &mut CliWorld, step: &Step) {
 async fn the_output_should_contain(world: &mut CliWorld, step: &Step) {
     assert!(world.command_output.is_some());
     // For some reason, the output docstring has a leading newline
-    let expected_output = step.docstring().unwrap().strip_prefix('\n').unwrap();
+    let docstring = step.docstring().unwrap();
+    debug!("docstring: {:?}", docstring);
+    let expected_output = docstring.strip_prefix('\n').unwrap();
     debug!("expected_output: {:?}", expected_output);
     let actual_output = world.command_output.as_ref().unwrap();
     debug!("actual_output: {:?}", actual_output);
@@ -107,4 +115,5 @@ async fn main() {
     info!("Running CLI tests");
 
     CliWorld::run("features/cli.feature").await;
+    CliWorld::run("features/repos.feature").await;
 }
