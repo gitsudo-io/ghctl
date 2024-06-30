@@ -1,17 +1,17 @@
 name: Tests
+
 on:
   push:
     branches:
-      - '**'
+      - "**"
     paths:
-      - "src/**"
-      - "Cargo.*"
-      - "test/**"
-      - "features/**"
-      - "Gemfile"
-      - "Gemfile.lock"
-      - ".ruby*"
-      - ".github/workflows/tests.yml"
+      - src/**
+      - Cargo.*
+      - tests/**
+      - features/**
+      - .github/workflows/tests.yml
+
+permissions: read-all
 
 jobs:
   test:
