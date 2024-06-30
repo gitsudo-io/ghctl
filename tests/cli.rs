@@ -36,12 +36,9 @@ async fn run_command(world: &mut CliWorld, step: &Step) {
 
     match Command::new(executable).args(args).output() {
         Ok(output) => {
-            debug!("Output: {:?}", output);
             let stdout = String::from_utf8(output.stdout).unwrap();
-            debug!("stdout: {}", stdout);
             world.command_output = Some(stdout);
             let stderr = String::from_utf8(output.stderr).unwrap();
-            debug!("stderr: {}", stderr);
             world.command_stderr = Some(stderr);
         }
         Err(e) => {
@@ -67,9 +64,7 @@ async fn it_should_output(world: &mut CliWorld, step: &Step) {
     assert!(world.command_output.is_some());
     // For some reason, the output docstring has a leading newline
     let expected_output = step.docstring().unwrap().strip_prefix('\n').unwrap();
-    debug!("expected_output: {:?}", expected_output);
     let actual_output = world.command_output.as_ref().unwrap();
-    debug!("actual_output: {:?}", actual_output);
     assert_eq!(expected_output, actual_output);
 }
 
@@ -78,11 +73,8 @@ async fn the_output_should_contain(world: &mut CliWorld, step: &Step) {
     assert!(world.command_output.is_some());
     // For some reason, the output docstring has a leading newline
     let docstring = step.docstring().unwrap();
-    debug!("docstring: {:?}", docstring);
     let expected_output = docstring.strip_prefix('\n').unwrap();
-    debug!("expected_output: {:?}", expected_output);
     let actual_output = world.command_output.as_ref().unwrap();
-    debug!("actual_output: {:?}", actual_output);
     assert!(actual_output.contains(expected_output));
 }
 
@@ -91,9 +83,7 @@ async fn stderr_should_contain(world: &mut CliWorld, step: &Step) {
     assert!(world.command_stderr.is_some());
     // For some reason, the output docstring has a leading newline
     let expected_stderr = step.docstring().unwrap().strip_prefix('\n').unwrap();
-    debug!("expected_stderr: {:?}", expected_stderr);
     let actual_stderr = world.command_stderr.as_ref().unwrap();
-    debug!("actual_stderr: {:?}", actual_stderr);
     assert!(actual_stderr.contains(expected_stderr));
 }
 
