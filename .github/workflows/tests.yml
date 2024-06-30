@@ -16,6 +16,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.CUCUMBER_GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -29,16 +31,3 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
       - run: |
           cargo clippy
-
-  cucumber:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-      - uses: ruby/setup-ruby@v1
-      - name: Cucumber + Aruba tests
-        env:
-          GITHUB_TOKEN: ${{ secrets.CUCUMBER_GITHUB_TOKEN }}
-        run: |
-          bundle install
-          cucumber
