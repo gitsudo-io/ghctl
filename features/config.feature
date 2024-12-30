@@ -17,5 +17,9 @@ Feature: Repository management features
             required_approving_review_count: 1
             dismiss_stale_reviews: false
             require_code_owner_reviews: false
+          required_status_checks:
+            strict: true
+            contexts:
+            - test
           enforce_admins: false
       ```

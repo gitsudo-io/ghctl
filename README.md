@@ -23,7 +23,7 @@ You can provide the access token to ghctl in one of the following ways:
   - explicitly pass it using the `--access-token` option
 
 
-### Download the latest release binary 
+### Download the latest release binary
 
 You can download the latest release binary (built for Debian Bookworm / Ubuntu 22.04 ) from the [Releases](https://github.com/gitsudo-io/ghctl/releases) page, using the GitHub CLI (`gh`) or just `curl`:
 
@@ -37,7 +37,7 @@ curl -L https://github.com/gitsudo-io/ghctl/releases/download/v0.3.1/ghctl > ghc
 
 Then make the file executable (`chmod u+x ghctl`) and place it in your `$PATH`.
 
- 
+
 ### Install using Cargo
 
 To install the `ghctl` binary using Cargo, you will need to have Rust 1.66.0 or later installed ([rustup](https://rustup.rs/)).
@@ -99,11 +99,6 @@ Will output something like:
 ```yaml
 teams:
   a-team: maintain
-environments:
-  gigalixir:
-    reviewers:
-    - aisrael
-    - gitsudo-io/a-team
 branch_protection_rules:
   main:
     require_pull_request:
@@ -111,9 +106,9 @@ branch_protection_rules:
       dismiss_stale_reviews: false
       require_code_owner_reviews: false
     required_status_checks:
-      strict: false
+      strict: true
       contexts:
-      - mix/test
+      - test
     enforce_admins: false
 ```
 
@@ -273,7 +268,7 @@ For example, given the following workflow:
 
 ```yaml
 name: Configure ghctl repository
-on: 
+on:
   push:
   workflow_dispatch:
 
