@@ -18,12 +18,9 @@ async fn a_valid_github_token_is_set(_world: &mut CliWorld) {
 #[when(regex = "the following command is run:")]
 async fn run_command(world: &mut CliWorld, step: &Step) {
     let raw_command = step.docstring().unwrap();
-    debug!("raw_command {}", raw_command);
     let parts = raw_command.split_whitespace().collect::<Vec<&str>>();
     assert!(!parts.is_empty(), "No command provided");
-    debug!("Parts: {:?}", parts);
     let mut args: Vec<&str> = parts[1..].to_vec();
-    debug!("Parts[0]: {}", parts[0]);
     let executable = if parts[0] == "ghctl" {
         args.insert(0, "--");
         args.insert(0, "run");
@@ -31,8 +28,6 @@ async fn run_command(world: &mut CliWorld, step: &Step) {
     } else {
         parts[0]
     };
-    debug!("Executable: {}", executable);
-    debug!("Args: {:?}", args);
 
     match Command::new(executable).args(args).output() {
         Ok(output) => {
