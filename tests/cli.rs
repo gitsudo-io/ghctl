@@ -78,6 +78,18 @@ async fn the_output_should_contain(world: &mut CliWorld, step: &Step) {
     assert!(actual_output.contains(expected_output));
 }
 
+#[then(expr = "the output YAML should contain:")]
+async fn the_output_should_contain_yaml(world: &mut CliWorld, step: &Step) {
+    assert!(world.command_output.is_some());
+    // For some reason, the output docstring has a leading newline
+    let docstring = step.docstring().unwrap();
+    let trimmed_docstring = docstring.strip_prefix('\n').unwrap();
+    let expected_output: serde_yaml::Value = serde_yaml::from_str(trimmed_docstring).unwrap();
+    let actual_output = world.command_output.as_ref().unwrap();
+    let actual_output_as_yaml: serde_yaml::Value = serde_yaml::from_str(actual_output).unwrap();
+    assert_eq!(expected_output, actual_output_as_yaml);
+}
+
 #[then(expr = "stderr should contain:")]
 async fn stderr_should_contain(world: &mut CliWorld, step: &Step) {
     assert!(world.command_stderr.is_some());
@@ -106,4 +118,5 @@ async fn main() {
 
     CliWorld::run("features/cli.feature").await;
     CliWorld::run("features/repos.feature").await;
+    CliWorld::run("features/config.feature").await;
 }
