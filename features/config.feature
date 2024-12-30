@@ -7,7 +7,7 @@ Feature: Repository management features
       ```
       ghctl repo config get gitsudo-io/ghctl
       ```
-    Then the output YAML should contain:
+    Then the output YAML should be:
       ```
       teams:
         a-team: maintain

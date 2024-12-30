@@ -78,16 +78,18 @@ async fn the_output_should_contain(world: &mut CliWorld, step: &Step) {
     assert!(actual_output.contains(expected_output));
 }
 
-#[then(expr = "the output YAML should contain:")]
+#[then(expr = "the output YAML should be:")]
 async fn the_output_should_contain_yaml(world: &mut CliWorld, step: &Step) {
     assert!(world.command_output.is_some());
     // For some reason, the output docstring has a leading newline
     let docstring = step.docstring().unwrap();
     let trimmed_docstring = docstring.strip_prefix('\n').unwrap();
-    let expected_output: serde_yaml::Value = serde_yaml::from_str(trimmed_docstring).unwrap();
-    let actual_output = world.command_output.as_ref().unwrap();
-    let actual_output_as_yaml: serde_yaml::Value = serde_yaml::from_str(actual_output).unwrap();
-    assert_eq!(expected_output, actual_output_as_yaml);
+    let expected_output_as_yaml: serde_yaml::Value = serde_yaml::from_str(trimmed_docstring).unwrap();
+    let expected_output = serde_yaml::to_string(&expected_output_as_yaml).unwrap();
+    let command_output = world.command_output.as_ref().unwrap();
+    let actual_output_as_yaml: serde_yaml::Value = serde_yaml::from_str(command_output).unwrap();
+    let actual_output = serde_yaml::to_string(&actual_output_as_yaml).unwrap();
+    assert_eq!(expected_output, actual_output);
 }
 
 #[then(expr = "stderr should contain:")]
